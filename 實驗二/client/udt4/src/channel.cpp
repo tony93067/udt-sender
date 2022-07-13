@@ -106,10 +106,10 @@ void CChannel::open(const sockaddr* addr)
   }
   else
   {
-     printf("設定 UDP before set, send buffer size = %d\n", sendbuf);
+     printf("before set, send buffer size = %d\n", sendbuf);
   }  
 
-  //int nSendBuf=1024 * 1024;//设置为1M
+  int nSendBuf= 1024 * 1024;//设置为1M
   //setsockopt(m_iSocket, SOL_SOCKET, SO_SNDBUF, (const char*)&nSendBuf, sizeof(int));
   
   optlen = sizeof(sendbuf);
@@ -120,7 +120,7 @@ void CChannel::open(const sockaddr* addr)
   }
   else
   {
-     printf("設定 UDP after set, send buffer size = %d\n", sendbuf);
+     printf("after set, send buffer size = %d\n", sendbuf);
   } */
   
   // recv_buf (Cindy)
@@ -135,9 +135,9 @@ void CChannel::open(const sockaddr* addr)
   }
   else
   {
-      printf("設定 UDP before set, recv buf size = %d\n", recvbuf);
+      printf("before set, recv buf size = %d\n", recvbuf);
   } 
-  //int n = 131071; // 1M
+  int n = 131071; // 1M
   /*if (setsockopt(m_iSocket, SOL_SOCKET, SO_RCVBUF, &n, sizeof(n)) == -1) {
      // deal with failure, or ignore if you can live with the default size
      printf("setsockopt\n");
@@ -156,11 +156,11 @@ void CChannel::open(const sockaddr* addr)
      }
      else
      {
-       printf("設定 UDP after set, recv buf size = %d\n", recvbuf);
+       printf("after set, recv buf size = %d\n", recvbuf);
      }
    }*/
-
-
+    recvbuf = 0;
+    getsockopt(m_iSocket, SOL_SOCKET, SO_RCVBUF, &recvbuf, &optlen);
    #ifdef WIN32
       if (INVALID_SOCKET == m_iSocket)
    #else
@@ -210,7 +210,7 @@ void CChannel::setUDPSockOpt()
    #if defined(BSD) || defined(OSX)
       // BSD system will fail setsockopt if the requested buffer size exceeds system maximum value
       int maxsize = 64000;
-      if (0 != setsockopt(m_iSocket, SOL_SOCKET, SO_RCVBUF, (char*)&m_iRcvBufSize, sizeof(int)))
+      if (0 != setsockopt(m_iSocket, SOL_SOCKET, SO_RCVBUF, (char*)&m_iRcvBu	fSize, sizeof(int)))
          setsockopt(m_iSocket, SOL_SOCKET, SO_RCVBUF, (char*)&maxsize, sizeof(int));
       if (0 != setsockopt(m_iSocket, SOL_SOCKET, SO_SNDBUF, (char*)&m_iSndBufSize, sizeof(int)))
          setsockopt(m_iSocket, SOL_SOCKET, SO_SNDBUF, (char*)&maxsize, sizeof(int));

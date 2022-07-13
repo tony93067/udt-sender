@@ -275,7 +275,31 @@ int main(int argc, char* argv[])
     printf("getsockopt error\n");
   }else
   {
+    cout << "UDT Send Buffer size : " << sndbuf << endl;
+  }
+  sndbuf = 0;
+  if (UDT::ERROR == UDT::getsockopt(client_data, 0, UDT_RCVBUF, (char *)&sndbuf, &oplen))
+  {
+    printf("getsockopt error\n");
+  }else
+  {
+    cout << "UDT Recv Buffer size : " << sndbuf << endl;
+  }
+  sndbuf = 0;
+  if (UDT::ERROR == UDT::getsockopt(client_data, 0, UDP_SNDBUF, (char *)&sndbuf, &oplen))
+  {
+    printf("getsockopt error\n");
+  }else
+  {
     cout << "UDP Send Buffer size : " << sndbuf << endl;
+  }
+  sndbuf = 0;
+  if (UDT::ERROR == UDT::getsockopt(client_data, 0, UDP_RCVBUF, (char *)&sndbuf, &oplen))
+  {
+    printf("getsockopt error\n");
+  }else
+  {
+    cout << "UDP Recv Buffer size : " << sndbuf << endl;
   }
    //freeaddrinfo(peer);
 	freeaddrinfo(local);
@@ -425,6 +449,7 @@ void close_connection()
      total_recv_packets = tmp_total_recv_packets;
    }
    cout << "[Data Loss]: " << (double)(num_packets * PACKET_SIZE - total_recv_size) * 100.0 / (num_packets * PACKET_SIZE) << " %" << endl;
+   //cout << "total_recv_size*8 " << total_recv_size*8 << endl;
    print_throughput(total_recv_size*8);  
  
    cout << "send END_TRANS" << endl;
@@ -524,28 +549,30 @@ void* recv_control_data(void* usocket)
 
 void print_throughput(double throughput)
 {
-  if(throughput_bits >= UNITS_G)
+  cout << "enter print throughput " <<endl;
+  cout << "througput " << throughput << endl;
+  if(throughput >= UNITS_G)
   {
-    throughput_bits /= UNITS_G;
-    printf("Throughput: %2.2f (Gbits/s)\n", throughput_bits);
-    printf("Throughput: %2.2f (GBytes/s)\n", throughput_bits / UNITS_BYTE_TO_BITS);
+    throughput /= UNITS_G;
+    printf("Throughput: %2.2f (Gbits/s)\n", throughput);
+    printf("Throughput: %2.2f (GBytes/s)\n", throughput / UNITS_BYTE_TO_BITS);
   }
-  else if(throughput_bits >= UNITS_M)
+  else if(throughput >= UNITS_M)
   {
-    throughput_bits /= UNITS_M;
-    printf("Throughput: %2.2f (Mbits/s)\n", throughput_bits);
-    printf("Throughput: %2.2f (MBytes/s)\n", throughput_bits / UNITS_BYTE_TO_BITS);
+    throughput /= UNITS_M;
+    printf("Throughput: %2.2f (Mbits/s)\n", throughput);
+    printf("Throughput: %2.2f (MBytes/s)\n", throughput / UNITS_BYTE_TO_BITS);
   }
-  else if(throughput_bits >= UNITS_K)
+  else if(throughput >= UNITS_K)
   {
-    throughput_bits /= UNITS_K;
-    printf("Throughput: %2.2f (Kbits/s)\n", throughput_bits);
-    printf("Throughput: %2.2f (KBytes/s)\n", throughput_bits / UNITS_BYTE_TO_BITS);
+    throughput /= UNITS_K;
+    printf("Throughput: %2.2f (Kbits/s)\n", throughput);
+    printf("Throughput: %2.2f (KBytes/s)\n", throughput / UNITS_BYTE_TO_BITS);
   }
   else
   {
-    printf("Throughput: %2.2f (bits/s)\n", throughput_bits);
-    printf("Throughput: %2.2f (Bytes/s)\n", throughput_bits / UNITS_BYTE_TO_BITS);
+    printf("Throughput: %2.2f (bits/s)\n", throughput);
+    printf("Throughput: %2.2f (Bytes/s)\n", throughput / UNITS_BYTE_TO_BITS);
   }
 }
 
