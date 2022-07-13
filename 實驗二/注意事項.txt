@@ -1,0 +1,3 @@
+原先論文程式碼內部 : service_data.c_str() ->  port_data_socket.c_str() 才能正確執行
+雖然原先有經過 service_data = port_data_socket;
+但是不知道為何不起作用
