@@ -43,7 +43,12 @@ struct buffer {
 };
 // compute execution time
 clock_t old_time, new_time;
-struct tms time_start,time_end;//use for count executing time
+// compute file writing time
+clock_t old_w_time, new_w_time, tmp_w_time = 0;
+// use for count executing time
+struct tms time_start,time_end;
+// use for count writing time
+struct tms time_w_start, time_w_end;
 double ticks;
 // packets
 int total_recv_packets = 0;
@@ -256,11 +261,11 @@ int main(int argc, char* argv[])
    
    
    
-   /*if (0 != getaddrinfo(argv[1], port_data_socket.c_str(), &hints, &peer))
+   if (0 != getaddrinfo(argv[1], port_data_socket.c_str(), &hints, &peer))
    {
       cout << "incorrect server/peer address. " << argv[1] << ":" << argv[2] << endl;
       return 0;
-   }*/
+   }
   
     cout << "IP "<<argv[1] << " " << port_data_socket.c_str() << endl;
     fflush(stdout);
@@ -382,6 +387,8 @@ int main(int argc, char* argv[])
    }
    return 1;*/
     int j = 0; // used to set start time
+    int fd; // use to open file
+    fd = open("file.txt", O_RDWR | O_CREAT | O_TRUNC | O_APPEND, S_IRWXU);
     while(1)
     {
 
@@ -390,33 +397,50 @@ int main(int argc, char* argv[])
 
         if(UDT::ERROR == (rsize = UDT::recv(client_data, (char *)&recv_buf.data, sizeof(recv_buf.data), 0))) 
         {
-        cout << "recv:" << UDT::getlasterror().getErrorMessage() << endl;
-        exit(1);
+            cout << "recv:" << UDT::getlasterror().getErrorMessage() << endl;
+            exit(1);
         }
         else
         {
-        //reset_timer();
-            
-        // record start time when receive first data packet
-        if(j == 0)
-        {
-            // create thread to monitor socket(client_data)
-            pthread_create(new pthread_t, NULL, monitor, &client_data);
-            //start time
-            cout << "enter" << endl;
-            if((old_time = times(&time_start)) == -1)
+            //reset_timer();
+            // record start time when receive first data packet
+            if(j == 0)
             {
-            printf("time error\n");
-            exit(1);
+                // record start time
+                if((old_time = times(&time_start)) == -1)
+                {
+                    cout << "time error" << endl;
+                    exit(1);
+                }
+                // create thread to monitor socket(client_data)
+                pthread_create(new pthread_t, NULL, monitor, &client_data);
             }
-            
-        }
-        total_recv_packets++;
-        total_recv_size += rsize ;
+            if((old_w_time = times(&time_w_start)) == -1)
+            {
+                cout << "time error" << endl;
+                exit(1);
+            }
+            if(write(fd, recv_buf.data, strlen(recv_buf.data)) == -1)
+            {
+                cout << "write error" << endl;
+                exit(1);
+            }
+            if((new_w_time = times(&time_w_end)) == -1)
+            {
+                cout << "time error" << endl;
+                exit(1);
+            }
+            tmp_w_time += (new_w_time - old_w_time);
+            total_recv_packets++;
+            total_recv_size += rsize ;
         }
         // timeout 到期，未收到封包
         if(rsize == 0)
+        {
+            // 接收完成, 關閉檔案
+            close(fd);
             break;
+        }
         j++;
 
     }
@@ -432,13 +456,14 @@ int main(int argc, char* argv[])
 }
 void close_connection()
 {
-    ticks=sysconf(_SC_CLK_TCK);
+    ticks = sysconf(_SC_CLK_TCK);
     printf("\n[Close Connection]\n");
     printf("Client Seq: %d\n", seq_client);
     //printf("TTL(ms): %d\n", ttl_ms); 
     //printf("Num of Out-of-Order Packet(Cumulative): %d\n", num_out_of_order);
-    //執行時間減去等待timeout的3秒
-    execute_time = (double)(new_time - old_time)/ticks - 3; 
+
+    //總執行時間 - 檔案寫入時間 - 最後等待到期3秒 = 實際執行接收時間
+    execute_time = (double)(new_time - old_time - tmp_w_time)/ticks - 3; 
     if(execute_time != 0) 
     {
         throughput_bits = (total_recv_packets * PACKET_SIZE * UNITS_BYTE_TO_BITS)/execute_time;
