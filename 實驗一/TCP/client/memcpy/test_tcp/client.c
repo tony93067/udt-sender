@@ -19,105 +19,108 @@
 
 int main(int argc, char **argv)
 {
-   printf("111\n");
-   static struct sockaddr_in server;
-   clock_t old,new;//use for count executing time
-   struct tms time_start,time_end;//use for count executing time
-   double ticks;
-   int sd;
-   struct hostent *host;
-   char server_name[SNAME_SIZE];
-   char buffer[BUFFER_SIZE];
-   int recv_size = 0;
-   int recv_packet = 0;
+    printf("111\n");
+    static struct sockaddr_in server;
+    clock_t old,new;//use for count executing time
+    struct tms time_start,time_end;//use for count executing time
+    double ticks;
+    int sd;
+    struct hostent *host;
+    char server_name[SNAME_SIZE];
+    char buffer[BUFFER_SIZE];
+    int recv_size = 0;
+    int recv_packet = 0;
 
-   printf("sizeof(buffer): %ld\n",sizeof(buffer));
-   if(argc != 2)
-   {
-     printf("Usage: %s <server_ip>\n",argv[0]);
-     exit(1);
-   }
+    printf("sizeof(buffer): %ld\n",sizeof(buffer));
 
-   strcpy(server_name,argv[1]);//set server
-   
-   /* Set up destination address. */
-   server.sin_family = AF_INET;
-   host = gethostbyname(server_name);
-   server.sin_port = htons(PORT);    
-   memcpy((char*)&server.sin_addr,host->h_addr_list[0],host->h_length);
+    if(argc != 2)
+    {
+        printf("Usage: %s <server_ip>\n",argv[0]);
+        exit(1);
+    }
 
-   sd = socket(AF_INET,SOCK_STREAM,0);
-   if(sd < 0)
-   {
-     DIE("socket");
-   }
+    strcpy(server_name,argv[1]);//set server
+    
+    /* Set up destination address. */
+    server.sin_family = AF_INET;
+    host = gethostbyname(server_name);
+    server.sin_port = htons(PORT);    
+    memcpy((char*)&server.sin_addr,host->h_addr_list[0],host->h_length);
 
-   /* Connect to the server. */
-   if(connect(sd,(struct sockaddr*)&server,sizeof(server)) == -1)
-   {
-     DIE("connect");
-   }
+    sd = socket(AF_INET,SOCK_STREAM,0);
+    if(sd < 0)
+    {
+        DIE("socket");
+    }
 
-   printf("Start Receiving!\nPacket Data Size: %d\n",(int)sizeof(buffer));
+    /* Connect to the server. */
+    if(connect(sd,(struct sockaddr*)&server,sizeof(server)) == -1)
+    {
+        DIE("connect");
+    }
 
-   /*receive packet*/
-   //start time
-   if((old = times(&time_start)) == -1)
-   {
-     DIE("times");
-   }
+    printf("Start Receiving!\nPacket Data Size: %d\n",(int)sizeof(buffer));
 
-   int total_recv_size = 0;
-   int fd;
-   char temp[20];
-   int len;
-   //fd = open("output.txt", O_RDWR | O_CREAT | O_TRUNC | O_APPEND, S_IRWXU);
-   if (fd == -1) {
+    /*receive packet*/
+    //start time
+    if((old = times(&time_start)) == -1)
+    {
+        DIE("times");
+    }
+
+    int total_recv_size = 0;
+    int fd;
+    int len;
+    // open file 
+    fd = open("output.txt", O_RDWR | O_CREAT | O_TRUNC | O_APPEND, S_IRWXU);
+    if (fd == -1) {
         perror("open\n");
         exit(EXIT_FAILURE);
-   }
-   while(1)
-   {
-    memset(temp, '\0', 20);
-    if((recv_size = recv(sd,(char *)buffer,sizeof(buffer),0)) < 0)
-    {
-      DIE("recv");
     }
-    else
+    while(1)
     {
-     	
-      if (recv_size > 0)
-     	{
-     		//sprintf(temp, "%d %d\n", recv_packet, recv_size);
-     		//len = strlen(temp);
-     		//write(fd, temp, len);
-       	recv_packet++;
-       	total_recv_size += recv_size;
-      }
+        memset(&buffer, '\0', BUFFER_SIZE);
+        if((recv_size = recv(sd,(char *)buffer,sizeof(buffer),0)) < 0)
+        {
+            DIE("recv");
+        }
+        else
+        { 
+            if (recv_size > 0)
+            {
+                // 寫入檔案
+                if(write(fd, buffer, strlen(buffer)) == -1)
+                {
+                    printf("write error\n");
+                    exit(1);
+                }
+                recv_packet++;
+                total_recv_size += recv_size;
+            }
 
-     }
+        }
 
-     if(recv_size == 0)//last packet, break loop
-     {
-     	//close(fd);
-       break;
-     }
-   }
-   //finish time
-   if((new = times(&time_end)) == -1)
-   {
-     DIE("times error\n");
-   }
-   /********************************/
-   
-   /*executing time*/
-   ticks=sysconf(_SC_CLK_TCK);
-   printf("Run Time: %2.2f\n",(double)(new-old)/ticks);
+        if(recv_size == 0)//last packet, break loop
+        {
+            close(fd);
+            break;
+        }
+    }
+    //finish time
+    if((new = times(&time_end)) == -1)
+    {
+        DIE("times error\n");
+    }
+    /********************************/
+    
+    /*executing time*/
+    ticks=sysconf(_SC_CLK_TCK);
+    printf("Run Time: %2.2f\n",(double)(new-old)/ticks);
 
-   printf("Recv Packet: %d\n",recv_packet);
-   printf("Recv Size: %d\n", total_recv_size);
-   //close connection
-   close(sd);
+    printf("Recv Packet: %d\n",recv_packet);
+    printf("Recv Size: %d\n", total_recv_size);
+    //close connection
+    close(sd);
 
 }
 
