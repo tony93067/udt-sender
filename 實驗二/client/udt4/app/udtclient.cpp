@@ -13,6 +13,9 @@
 #include <stdlib.h>
 #include <iostream>
 #include <udt.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <sys/times.h>
 
 #include "cc.h"
@@ -170,10 +173,9 @@ int main(int argc, char* argv[])
         cout << "send:" << UDT::getlasterror().getErrorMessage() << endl;
         exit(1);
     }
-
+    int rs = 0;
     // receive num_packets_recv
     /*
-    int rs = 0;
     char num_packets_recv[NUM_PACKET_LENGTH];
     if (UDT::ERROR == (rs = UDT::recv(client_control, num_packets_recv, sizeof(num_packets_recv), 0)))
     {
@@ -420,7 +422,7 @@ int main(int argc, char* argv[])
                 cout << "time error" << endl;
                 exit(1);
             }
-            if(write(fd, recv_buf.data, strlen(recv_buf.data)) == -1)
+            if(write(fd, recv_buf.data, rsize) == -1)
             {
                 cout << "write error" << endl;
                 exit(1);
