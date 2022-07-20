@@ -82,6 +82,7 @@ int continuous_timeo = 0;
 
 int mode;
 int output_interval = 5000000; // 5sec
+int mss = 0;
 //socket ID
 UDTSOCKET client_control;
 UDTSOCKET client_data;
@@ -106,12 +107,12 @@ int main(int argc, char* argv[])
 {
     if ((5 != argc) || (0 == atoi(argv[2])) || (atoi(argv[4]) != 1 && atoi(argv[4]) != 2))
     {
-        cout << "usage: ./udtclient [server_ip] [server_port] [output_interval(sec)] [mode(1 or 2)]" << endl;
+        cout << "usage: ./udtclient [server_ip] [server_port] [MSS] [mode(1 or 2)]" << endl;
         return 0;
     }
 
-    output_interval = atoi(argv[3]) * UNITS_M; // 1us * 1Ms => 1s (because usleep use u as unit)
-    cout << "output_interval: " << output_interval << endl;
+    mss = atoi(argv[3]); // 1us * 1Ms => 1s (because usleep use u as unit)
+    cout << "mss: " << mss << endl;
 
     mode = atoi(argv[4]);
     cout << "Choose mode: " << mode << endl;
@@ -257,7 +258,7 @@ int main(int argc, char* argv[])
    // UDT Options
    //UDT::setsockopt(client_data, 0, UDT_RCVTIMEO, &recv_timeo, sizeof(int));
    //UDT::setsockopt(client_data, 0, UDT_CC, new CCCFactory<CUDPBlast>, sizeof(CCCFactory<CUDPBlast>));
-   //UDT::setsockopt(client_data, 0, UDT_MSS, new int(8999), sizeof(int));
+    UDT::setsockopt(client_data, 0, UDT_MSS, new int(mss), sizeof(int));
    //UDT::setsockopt(client_data, 0, UDT_SNDBUF, new int(10000000), sizeof(int));
    //UDT::setsockopt(client_data, 0, UDP_SNDBUF, new int(10000000), sizeof(int));
    
@@ -311,13 +312,15 @@ int main(int argc, char* argv[])
         cout << "UDP Recv Buffer size : " << sndbuf << endl;
     }
 
+    sndbuf = 0;
     // 設定3秒未接收到封包則, recv function return 0
-    if (UDT::ERROR == UDT::setsockopt(client_data, 0, UDT_RCVTIMEO, new int(3000), sizeof(int)))
+    if (UDT::ERROR == UDT::setsockopt(client_data, 0, UDT_RCVTIMEO, new int(10000), sizeof(int)))
     {
         cout << "set RCV timeout error" << endl;
     }else
     {
-        cout << "Set RCV timeout : 3000 ms" << endl;
+        UDT::getsockopt(client_data, 0, UDT_RCVTIMEO, (char *)&sndbuf, &oplen);
+        cout << "Set RCV timeout : "<< sndbuf << endl;
     }
     //freeaddrinfo(peer);
     freeaddrinfo(local);
@@ -393,17 +396,18 @@ int main(int argc, char* argv[])
     fd = open("file.txt", O_RDWR | O_CREAT | O_TRUNC | O_APPEND, S_IRWXU);
     while(1)
     {
-
         // reset recv_buf.data
         memset(recv_buf.data, 0,sizeof(recv_buf.data));
 
-        if(UDT::ERROR == (rsize = UDT::recv(client_data, (char *)&recv_buf.data, sizeof(recv_buf.data), 0))) 
+        // 未收到資料時回傳 -1
+        if(UDT::ERROR == (rsize = UDT::recv(client_data, (char *)recv_buf.data, sizeof(recv_buf.data), 0))) 
         {
             cout << "recv:" << UDT::getlasterror().getErrorMessage() << endl;
-            exit(1);
+            cout << rsize << endl;
         }
         else
         {
+            //cout << "rsize : " << rsize << endl;
             //reset_timer();
             // record start time when receive first data packet
             if(j == 0)
@@ -415,31 +419,21 @@ int main(int argc, char* argv[])
                     exit(1);
                 }
                 // create thread to monitor socket(client_data)
-                pthread_create(new pthread_t, NULL, monitor, &client_data);
-            }
-            if((old_w_time = times(&time_w_start)) == -1)
-            {
-                cout << "time error" << endl;
-                exit(1);
+                //pthread_create(new pthread_t, NULL, monitor, &client_data);
             }
             if(write(fd, recv_buf.data, rsize) == -1)
             {
                 cout << "write error" << endl;
                 exit(1);
             }
-            if((new_w_time = times(&time_w_end)) == -1)
-            {
-                cout << "time error" << endl;
-                exit(1);
-            }
-            tmp_w_time += (new_w_time - old_w_time);
             total_recv_packets++;
             total_recv_size += rsize ;
         }
         // timeout 到期，未收到封包
-        if(rsize == 0)
+        if(rsize == -1)
         {
             // 接收完成, 關閉檔案
+            cout << "receiving finish" << endl;
             close(fd);
             break;
         }
@@ -464,8 +458,8 @@ void close_connection()
     //printf("TTL(ms): %d\n", ttl_ms); 
     //printf("Num of Out-of-Order Packet(Cumulative): %d\n", num_out_of_order);
 
-    //總執行時間 - 檔案寫入時間 - 最後等待到期3秒 = 實際執行接收時間
-    execute_time = (double)(new_time - old_time - tmp_w_time)/ticks - 3; 
+    //總執行時間 - 檔案寫入時間 - 最後等待到期10秒 = 實際執行接收時間
+    execute_time = (double)(new_time - old_time)/ticks - 10; 
     if(execute_time != 0) 
     {
         throughput_bits = (total_recv_packets * PACKET_SIZE * UNITS_BYTE_TO_BITS)/execute_time;
@@ -475,16 +469,17 @@ void close_connection()
         throughput_bits = 0;
     }
     printf("Total Execute Time (sec): %2.2f\n", execute_time);
-    printf("num_packets(from server): %d, total_recv_packets: %d\n", num_packets, total_recv_packets);
-    printf("total_recv_size: %d\n", total_recv_size); 
+    //printf("num_packets(from server): %d, total_recv_packets: %d\n", num_packets, total_recv_packets);
+    printf("Total_recv_size: %d\n", total_recv_size); 
 
     if(mode == 2)
     {
         total_recv_packets = tmp_total_recv_packets;
     }
-    cout << "[Data Loss]: " << (double)(num_packets * PACKET_SIZE - total_recv_size) * 100.0 / (num_packets * PACKET_SIZE) << " %" << endl;
+    //cout << "[Data Loss]: " << (double)(num_packets * PACKET_SIZE - total_recv_size) * 100.0 / (num_packets * PACKET_SIZE) << " %" << endl;
     //cout << "total_recv_size*8 " << total_recv_size*8 << endl;
-    print_throughput(total_recv_size*8);  
+    throughput_bits = (double)total_recv_size / execute_time;
+    print_throughput(throughput_bits);  
     
     cout << "send END_TRANS" << endl;
     char control_data3[sizeof(END_TRANS)];
@@ -583,25 +578,25 @@ void* recv_control_data(void* usocket)
 
 void print_throughput(double throughput)
 {
-  cout << "enter print throughput " <<endl;
+  //cout << "enter print throughput " << endl;
   cout << "througput " << throughput << endl;
   if(throughput >= UNITS_G)
   {
     throughput /= UNITS_G;
-    printf("Throughput: %2.2f (Gbits/s)\n", throughput);
-    printf("Throughput: %2.2f (GBytes/s)\n", throughput / UNITS_BYTE_TO_BITS);
+    printf("Throughput: %2.2f (Gbytes/s)\n", throughput);
+    //printf("Throughput: %2.2f (GBytes/s)\n", throughput / UNITS_BYTE_TO_BITS);
   }
   else if(throughput >= UNITS_M)
   {
     throughput /= UNITS_M;
-    printf("Throughput: %2.2f (Mbits/s)\n", throughput);
-    printf("Throughput: %2.2f (MBytes/s)\n", throughput / UNITS_BYTE_TO_BITS);
+    printf("Throughput: %2.2f (Mbytes/s)\n", throughput);
+    //printf("Throughput: %2.2f (MBytes/s)\n", throughput / UNITS_BYTE_TO_BITS);
   }
   else if(throughput >= UNITS_K)
   {
     throughput /= UNITS_K;
-    printf("Throughput: %2.2f (Kbits/s)\n", throughput);
-    printf("Throughput: %2.2f (KBytes/s)\n", throughput / UNITS_BYTE_TO_BITS);
+    printf("Throughput: %2.2f (Kbyte/s)\n", throughput);
+    //printf("Throughput: %2.2f (KBytes/s)\n", throughput / UNITS_BYTE_TO_BITS);
   }
   else
   {

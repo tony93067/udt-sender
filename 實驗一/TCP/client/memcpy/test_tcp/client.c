@@ -79,17 +79,19 @@ int main(int argc, char **argv)
     }
     while(1)
     {
-        memset(&buffer, '\0', BUFFER_SIZE);
-        if((recv_size = recv(sd,(char *)buffer,sizeof(buffer),0)) < 0)
+        memset(buffer, '\0', BUFFER_SIZE);
+        if((recv_size = recv(sd, buffer,sizeof(buffer),0)) < 0)
         {
             DIE("recv");
         }
         else
-        { 
+        {
+            //printf("recv size %d\n", recv_size); 
             if (recv_size > 0)
             {
+                //printf("%s %d\n", buffer, recv_size);
                 // 寫入檔案
-                if(write(fd, buffer, strlen(buffer)) == -1)
+                if(write(fd, buffer, recv_size) == -1)
                 {
                     printf("write error\n");
                     exit(1);

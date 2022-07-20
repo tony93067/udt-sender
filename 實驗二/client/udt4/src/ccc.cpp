@@ -42,7 +42,9 @@ written by
 #include "core.h"
 #include "ccc.h"
 #include <cmath>
+#include <iostream>
 #include <cstring>
+using namespace std;
 
 CCC::CCC():
 m_iSYNInterval(CUDT::m_iSYNInterval),
@@ -73,6 +75,7 @@ CCC::~CCC()
 void CCC::setACKTimer(const int& msINT)
 {
    m_iACKPeriod = msINT;
+   cout << "Ack interval : " << msINT << endl;
 
    if (m_iACKPeriod > m_iSYNInterval)
       m_iACKPeriod = m_iSYNInterval;
@@ -174,7 +177,7 @@ void CUDTCC::init()
 {
    m_iRCInterval = m_iSYNInterval;
    m_LastRCTime = CTimer::getTime();
-   setACKTimer(m_iRCInterval);
+   setACKTimer(m_iRCInterval/50);
 
    m_bSlowStart = true;
    m_iLastAck = m_iSndCurrSeqNo;
