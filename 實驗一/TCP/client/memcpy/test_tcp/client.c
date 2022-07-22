@@ -43,9 +43,10 @@ int main(int argc, char **argv)
     
     /* Set up destination address. */
     server.sin_family = AF_INET;
-    host = gethostbyname(server_name);
+    server.sin_addr.s_addr = inet_addr(argv[1]);
+    //host = gethostbyname(server_name);
     server.sin_port = htons(PORT);    
-    memcpy((char*)&server.sin_addr,host->h_addr_list[0],host->h_length);
+    //memcpy((char*)&server.sin_addr,host->h_addr_list[0],host->h_length);
 
     sd = socket(AF_INET,SOCK_STREAM,0);
     if(sd < 0)
