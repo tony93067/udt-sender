@@ -75,7 +75,6 @@ CCC::~CCC()
 void CCC::setACKTimer(const int& msINT)
 {
    m_iACKPeriod = msINT;
-   cout << "Ack interval : " << msINT << endl;
 
    if (m_iACKPeriod > m_iSYNInterval)
       m_iACKPeriod = m_iSYNInterval;
@@ -177,7 +176,7 @@ void CUDTCC::init()
 {
    m_iRCInterval = m_iSYNInterval;
    m_LastRCTime = CTimer::getTime();
-   setACKTimer(m_iRCInterval/50);
+   setACKTimer(m_iRCInterval);
 
    m_bSlowStart = true;
    m_iLastAck = m_iSndCurrSeqNo;

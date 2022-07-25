@@ -54,6 +54,7 @@ written by
 #endif
 #include <cmath>
 #include <sstream>
+#include <iostream>
 #include "queue.h"
 #include "core.h"
 
@@ -525,6 +526,7 @@ void CUDT::open()
    // set up the timers
    m_ullSYNInt = m_iSYNInterval * m_ullCPUFrequency;
   
+   cout << "m_ullCPUFrequency : " << m_ullCPUFrequency << endl;
    // set minimum NAK and EXP timeout to 100ms
    m_ullMinNakInt = 300000 * m_ullCPUFrequency;
    m_ullMinExpInt = 300000 * m_ullCPUFrequency;
