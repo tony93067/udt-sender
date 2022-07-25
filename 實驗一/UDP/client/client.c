@@ -7,51 +7,49 @@
 #include <string.h>
 #include <unistd.h>
 
-#define BUFFER_SIZE 1500
+#define BUFFER_SIZE 10000
 #define SERVER_PORT 8888
 #define SERVER_IP "140.117.171.182"
-
-void udp_send(int fd, struct sockaddr* server)
-{
-    int recv_size, send_size;
-    socklen_t len = sizeof(*server);
-    char buffer[BUFFER_SIZE];
-    memcpy(buffer, "udp test\n", sizeof("udp test\n"));
-    if((send_size = sendto(fd, buffer, BUFFER_SIZE, 0, server, len)) == -1)
-    {
-            printf("sendto error\n");
-            exit(1);
-    }
-    while(1)
-    {
-        memset(buffer, '\0', BUFFER_SIZE);
-        if((recv_size = recvfrom(fd, buffer, BUFFER_SIZE, 0, server, &len)) == -1)
-        {
-            printf("recvfrom error\n");
-            exit(1);
-        }else
-        {
-            if(recv_size == 0)
-                break;
-            printf("recv message : %s\n", buffer);
-        }
-    }
-}
 
 int main(int argc, char** argv)
 {
     int socket_fd;
-    struct sockaddr_in src;
+    struct sockaddr_in server_addr;
+    int server_length = sizeof(server_addr);
 
-    socket_fd = socket(AF_INET, SOCK_DGRAM, 0);
-    src.sin_family = AF_INET;
-    src.sin_addr.s_addr = inet_addr(SERVER_IP);
-    src.sin_port = htons(SERVER_PORT);
+    char buffer[BUFFER_SIZE];
+    int recv_size, send_size;
 
-    udp_send(socket_fd, (struct sockaddr*)&src);
+    // set socket info
+    socket_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = inet_addr(SERVER_IP);
+    server_addr.sin_port = htons(SERVER_PORT);
 
-    close(socket_fd);
-
-    return 0;
+    if(socket_fd < 0){
+        printf("Error while creating socket\n");
+        return -1;
+    }
+    printf("Socket created successfully\n");
+    memset(buffer, '\0', BUFFER_SIZE);
+    // Send the message to server:
+    if((send_size = sendto(socket_fd, buffer, strlen(buffer), 0, (struct sockaddr*)&server_addr, server_length)) < 0){
+        printf("Unable to send message\n");
+        return -1;
+    }
+    while(1)
+    {
+        memset(buffer, '\0', BUFFER_SIZE);
+        // Receive the server's response:
+        if((recv_size = recvfrom(socket_fd, buffer, sizeof(buffer), 0, (struct sockaddr*)&server_addr, &server_length) < 0)){
+            printf("Error while receiving server's msg\n");
+            return -1;
+        }
+        printf("Server's response: %s\n", buffer);
+    }
     
+    // Close the socket:
+    close(socket_fd);
+    
+    return 0;
 }

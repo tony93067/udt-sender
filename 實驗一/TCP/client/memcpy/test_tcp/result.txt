@@ -1,1 +1,0 @@
-TCP 1Gb data size = 1500 byte : 444.22 second

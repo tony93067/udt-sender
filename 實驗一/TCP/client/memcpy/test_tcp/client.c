@@ -11,15 +11,15 @@
 #include <fcntl.h>
 #include <sys/times.h>
 #include <string.h>
+#include <arpa/inet.h>
 
 #define DIE(x) perror(x),exit(1)
-#define PORT 1290
+#define PORT 8888
 #define SNAME_SIZE 1024
-#define BUFFER_SIZE 1500
+#define BUFFER_SIZE 10000
 
 int main(int argc, char **argv)
 {
-    printf("111\n");
     static struct sockaddr_in server;
     clock_t old,new;//use for count executing time
     struct tms time_start,time_end;//use for count executing time
@@ -47,7 +47,7 @@ int main(int argc, char **argv)
     //host = gethostbyname(server_name);
     server.sin_port = htons(PORT);    
     //memcpy((char*)&server.sin_addr,host->h_addr_list[0],host->h_length);
-
+    printf("Client Socket Open:\n");
     sd = socket(AF_INET,SOCK_STREAM,0);
     if(sd < 0)
     {
@@ -60,7 +60,7 @@ int main(int argc, char **argv)
         DIE("connect");
     }
 
-    printf("Start Receiving!\nPacket Data Size: %d\n",(int)sizeof(buffer));
+    printf("Start Receiving!\n");
 
     /*receive packet*/
     //start time
@@ -97,7 +97,6 @@ int main(int argc, char **argv)
                     printf("write error\n");
                     exit(1);
                 }
-                recv_packet++;
                 total_recv_size += recv_size;
             }
 
@@ -119,8 +118,6 @@ int main(int argc, char **argv)
     /*executing time*/
     ticks=sysconf(_SC_CLK_TCK);
     printf("Run Time: %2.2f\n",(double)(new-old)/ticks);
-
-    printf("Recv Packet: %d\n",recv_packet);
     printf("Recv Size: %d\n", total_recv_size);
     //close connection
     close(sd);
