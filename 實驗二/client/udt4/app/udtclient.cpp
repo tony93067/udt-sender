@@ -316,7 +316,7 @@ int main(int argc, char* argv[])
         }
         else
         {
-            cout << "rsize : " << rsize << endl;
+            //cout << "rsize : " << rsize << endl;
             // record start time when receive first data packet
             if(j == 0)
             {
@@ -360,6 +360,12 @@ int main(int argc, char* argv[])
 }
 void close_connection()
 {
+    int result_fd;
+    char str[100];
+    // record result
+    result_fd = open("result.txt", O_RDWR | O_CREAT | O_APPEND, S_IRWXU);
+    memset(str, '\0', 100);
+
     ticks = sysconf(_SC_CLK_TCK);
     printf("\n[Close Connection]\n");
     printf("Client Seq: %d\n", seq_client);
@@ -367,16 +373,24 @@ void close_connection()
     //總執行時間 - 檔案寫入時間 - 最後等待到期10秒 = 實際執行接收時間
     execute_time = (double)(new_time - old_time)/ticks - 10; 
     printf("Total Execute Time (sec): %2.2f\n", execute_time);
+
+    sprintf(str, "UDT\nMss: %d\nTotal Execute Time (sec) : %f\n\n", mss, execute_time);
+    if(write(result_fd, str, strlen(str)) < 0)
+    {
+        cout << "write error\n";
+        exit(1);
+    }
+    close(result_fd);
     //printf("num_packets(from server): %d, total_recv_packets: %d\n", num_packets, total_recv_packets);
-    printf("Total_recv_size: %d\n", total_recv_size); 
+    //printf("Total_recv_size: %d\n", total_recv_size); 
 
     if(mode == 2)
     {
         total_recv_packets = tmp_total_recv_packets;
     }
+    
     throughput_bytes = (double)total_recv_size / execute_time;
     print_throughput(throughput_bytes);  
-    
     cout << "send END_TRANS" << endl;
     char control_data3[sizeof(END_TRANS)];
     int ss_control_data3 = 0;
@@ -430,7 +444,7 @@ void* monitor(void* s)
 DWORD WINAPI monitor(LPVOID s)
 #endif
 {
-  UDTSOCKET u = *(UDTSOCKET*)s;
+   UDTSOCKET u = *(UDTSOCKET*)s;
 
    UDT::TRACEINFO perf;
 
@@ -439,9 +453,9 @@ DWORD WINAPI monitor(LPVOID s)
    while (true)
    {
       #ifndef WIN32
-         sleep(100);
+         sleep(1);
       #else
-         Sleep(10);
+         Sleep(1000);
       #endif
 
       if (UDT::ERROR == UDT::perfmon(u, &perf))
