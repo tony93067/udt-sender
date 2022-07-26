@@ -40,10 +40,6 @@ using namespace std;
 #define CONTROL_DEFAULT_PORT "9000"
 #define DATA_DEFAULT_PORT "8999"
 
-/* global variables */
-struct buffer {
-    char data[BUFFER_SIZE];
-};
 // compute execution time
 clock_t old_time, new_time;
 // compute file writing time
@@ -444,38 +440,59 @@ void* monitor(void* s)
 DWORD WINAPI monitor(LPVOID s)
 #endif
 {
-   UDTSOCKET u = *(UDTSOCKET*)s;
+    UDTSOCKET u = *(UDTSOCKET*)s;
 
-   UDT::TRACEINFO perf;
-
-   cout << "SendRate(Mb/s)\tRTT(ms)\tCWnd\tPktSndPeriod(us)\tRecvACK\tRecvNAK" << endl;
-
-   while (true)
-   {
-      #ifndef WIN32
-         sleep(1);
-      #else
-         Sleep(1000);
-      #endif
-
-      if (UDT::ERROR == UDT::perfmon(u, &perf))
-      {
-         cout << "perfmon: " << UDT::getlasterror().getErrorMessage() << endl;
-         break;
-      }
-
-      cout << perf.mbpsSendRate << "\t\t" 
-           << perf.msRTT << "\t" 
-           << perf.pktCongestionWindow << "\t" 
-           << perf.usPktSndPeriod << "\t\t\t" 
-           << perf.pktRecvACK << "\t" 
-           << perf.pktRecvNAK << endl;
-   }
-
-   #ifndef WIN32
-      return NULL;
-   #else
-      return 0;
-   #endif
+    UDT::TRACEINFO perf;
+    int monitor_fd;
+    char str[100];
+    
+    // record monitor data
+    monitor_fd = open("monitor.txt", O_RDWR | O_CREAT | O_APPEND, S_IRWXU);
+    memset(str, '\0', 100);
+    strcpy(str, "SendRate(Mb/s)\tRTT(ms)\tCWnd\tPktSndPeriod(us)\tRecvACK\tRecvNAK");
+	if(write(monitor_fd, str, strlen(str)) < 0)
+    {
+        cout << "write error" << endl;
+        exit(1);
+    }
+    cout << "SendRate(Mb/s)\tRTT(ms)\tCWnd\tPktSndPeriod(us)\tRecvACK\tRecvNAK" << endl;
+    while (true)
+    {
+        memset(str, '\0', 100);
+        #ifndef WIN32
+            sleep(1);
+        #else
+            Sleep(1000);
+        #endif
+            
+        if (UDT::ERROR == UDT::perfmon(u, &perf))
+        {
+            cout << "perfmon: " << UDT::getlasterror().getErrorMessage() << endl;
+            break;
+        }
+        sprintf(str, "%f\t\t%f\t%d\t%f\t\t\t%d\t%d\n", perf.mbpsSendRate, 
+            perf.msRTT, perf.pktCongestionWindow, perf.usPktSndPeriod, perf.pktRecvACK, perf.pktRecvNAK);
+        if(write(monitor_fd, str, strlen(str)) < 0)
+        {
+            cout << "write error" << endl;
+            exit(1);
+        }
+        cout << perf.mbpsSendRate << "\t\t" 
+            << perf.msRTT << "\t" 
+            << perf.pktCongestionWindow << "\t" 
+            << perf.usPktSndPeriod << "\t\t\t" 
+            << perf.pktRecvACK << "\t" 
+            << perf.pktRecvNAK << endl;
+    }
+    if(write(monitor_fd, "\n", sizeof("\n")) < 0)
+    {
+        cout << "write error" << endl;
+        exit(1);
+    }
+    close(monitor_fd);
+    #ifndef WIN32
+        return NULL;
+    #else
+        return 0;
+    #endif
 }
-
