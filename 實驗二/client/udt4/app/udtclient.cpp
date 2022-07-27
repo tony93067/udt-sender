@@ -323,7 +323,7 @@ int main(int argc, char* argv[])
                     exit(1);
                 }
                 // create thread to monitor socket(client_data)
-                pthread_create(new pthread_t, NULL, monitor, &client_data);
+                //pthread_create(new pthread_t, NULL, monitor, &client_data);
             }
             
             if(write(fd, recv_buf, rsize) == -1)
