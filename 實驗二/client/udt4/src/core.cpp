@@ -566,7 +566,7 @@ void CUDT::listen()
 
    m_bListening = true;
 }
-
+// client 執行
 void CUDT::connect(const sockaddr* serv_addr)
 {
    CGuard cg(m_ConnectionLock);
@@ -690,6 +690,7 @@ void CUDT::connect(const sockaddr* serv_addr)
       throw e;
 }
 
+// client 執行
 int CUDT::connect(const CPacket& response) throw ()
 {
    // this is the 2nd half of a connection request. If the connection is setup successfully this returns 0.
@@ -810,6 +811,7 @@ POST_CONNECT:
    return 0;
 }
 
+// server 執行
 void CUDT::connect(const sockaddr* peer, CHandShake* hs)
 {
    CGuard cg(m_ConnectionLock);

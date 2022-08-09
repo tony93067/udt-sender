@@ -33,7 +33,7 @@ using namespace std;
 #define UNITS_BYTE_TO_BITS 8
 
 // define packet size(bytes)
-#define BUFFER_SIZE 3000
+#define BUFFER_SIZE 10000
 #define NUM_PACKET_LENGTH 1000
 
 // define DEFAULT_PORT
@@ -50,9 +50,6 @@ struct tms time_start,time_end;
 struct tms time_w_start, time_w_end;
 double ticks;
 // packets
-int total_recv_packets = 0;
-int tmp_total_recv_packets = 0;// use for mode 2 to compute interval num of packets
-int final_total_recv_packets = 0;
 int total_recv_size = 0;
 int tmp_total_recv_size = 0;
 int final_total_recv_size = 0;
@@ -180,7 +177,7 @@ int main(int argc, char* argv[])
     if(rs > 0)
     {
         seq_client = atoi(seq_client_recv);
-        cout << "rs(seq_client_recv): " << rs << endl;
+        //cout << "rs(seq_client_recv): " << rs << endl;
         cout << "seq_client: " << seq_client << endl;
     }
     
@@ -194,7 +191,7 @@ int main(int argc, char* argv[])
     string service_data(DATA_DEFAULT_PORT); 
     if(rs > 0)
     {
-        cout << "rs(port_data_socket): " << rs << endl;
+        //cout << "rs(port_data_socket): " << rs << endl;
         cout << "port_data_socket: " << port_data_socket.c_str() << endl;
         service_data = port_data_socket;
         //cout << "service_data: " << port_data_socket.c_str() << endl;
@@ -219,11 +216,12 @@ int main(int argc, char* argv[])
      
    // UDT Options
    //UDT::setsockopt(client_data, 0, UDT_RCVTIMEO, &recv_timeo, sizeof(int));
-   //UDT::setsockopt(client_data, 0, UDT_CC, new CCCFactory<CUDPBlast>, sizeof(CCCFactory<CUDPBlast>));
+    UDT::setsockopt(client_data, 0, UDT_CC, new CCCFactory<CUDPBlast>, sizeof(CCCFactory<CUDPBlast>));
     UDT::setsockopt(client_data, 0, UDT_MSS, new int(mss), sizeof(int));
    //UDT::setsockopt(client_data, 0, UDT_SNDBUF, new int(10000000), sizeof(int));
    //UDT::setsockopt(client_data, 0, UDP_SNDBUF, new int(10000000), sizeof(int));
-   
+   	int sndbuf = 0;
+    int oplen = sizeof(int);
     if (UDT::ERROR == UDT::setsockopt(client_data, 0, UDT_MSS, new int(mss), sizeof(int)))
     {
         cout << "setsockopt(mss): " << UDT::getlasterror().getErrorMessage() << endl;
@@ -232,7 +230,13 @@ int main(int argc, char* argv[])
     {
         cout << "Set MSS size : " << mss << endl;
     }
-
+	if (UDT::ERROR == UDT::getsockopt(client_data, 0, UDT_MSS, (char *)&sndbuf, &oplen))
+    {
+        printf("getsockopt error\n");
+    }else
+    {
+        cout << "UDT MSS : " << sndbuf << endl;
+    }
    
     if (0 != getaddrinfo(argv[1], port_data_socket.c_str(), &hints, &peer))
     {
@@ -242,14 +246,20 @@ int main(int argc, char* argv[])
   
     cout << "IP "<<argv[1] << " " << port_data_socket.c_str() << endl;
     fflush(stdout);
+     sndbuf = 0;
     // connect to the server, implict bind
     if (UDT::ERROR == UDT::connect(client_data, local->ai_addr, local->ai_addrlen))
     {
         cout << "connect(client_data): " << UDT::getlasterror().getErrorMessage() << endl;
         return 0;
     }
-    int sndbuf = 0;
-    int oplen = sizeof(int);
+    // using CC method
+    //CUDPBlast* cchandle = NULL;
+    //int temp;
+    //UDT::getsockopt(client, 0, UDT_CC, &cchandle, &temp);
+    //if (NULL != cchandle)
+    //    cchandle->setRate(500);
+    
     if (UDT::ERROR == UDT::getsockopt(client_data, 0, UDT_SNDBUF, (char *)&sndbuf, &oplen))
     {
         printf("getsockopt error\n");
@@ -282,8 +292,8 @@ int main(int argc, char* argv[])
         cout << "UDP Recv Buffer size : " << sndbuf << endl;
     }
     sndbuf = 0;
-    // 設定10秒未接收到封包則, recv function return 0
-    if (UDT::ERROR == UDT::setsockopt(client_data, 0, UDT_RCVTIMEO, new int(10000), sizeof(int)))
+    // 設定20秒未接收到封包則, recv function return 0
+    if (UDT::ERROR == UDT::setsockopt(client_data, 0, UDT_RCVTIMEO, new int(20000), sizeof(int)))
     {
         cout << "set RCV timeout error" << endl;
     }else
@@ -367,7 +377,7 @@ void close_connection()
     printf("Client Seq: %d\n", seq_client);
 
     //總執行時間 - 檔案寫入時間 - 最後等待到期10秒 = 實際執行接收時間
-    execute_time = (double)(new_time - old_time)/ticks - 10; 
+    execute_time = (double)(new_time - old_time)/ticks - 20; 
     printf("Total Execute Time (sec): %2.2f\n", execute_time);
 
     sprintf(str, "UDT\nMss: %d\nTotal Execute Time (sec) : %f\n\n", mss, execute_time);
@@ -379,11 +389,6 @@ void close_connection()
     close(result_fd);
     //printf("num_packets(from server): %d, total_recv_packets: %d\n", num_packets, total_recv_packets);
     //printf("Total_recv_size: %d\n", total_recv_size); 
-
-    if(mode == 2)
-    {
-        total_recv_packets = tmp_total_recv_packets;
-    }
     
     throughput_bytes = (double)total_recv_size / execute_time;
     print_throughput(throughput_bytes);  
