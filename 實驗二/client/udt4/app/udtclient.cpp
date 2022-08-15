@@ -57,7 +57,6 @@ int num_packets = 0;
 int seq_client = 0;
 int totalbytes = 0;
 double execute_time;
-double tmp_execute_time = 0;
 double final_execute_time = 0.0f; 
 double throughput_bytes = 0.0f; 
 string port_data_socket;
@@ -71,10 +70,10 @@ bool timeout = false;
 
 int num_timeo = 0;
 int continuous_timeo = 0;
-// int recv_timeo = 5000;
+
+char method[15];
 
 int mode;
-int output_interval = 5000000; // 5sec
 int mss = 0;
 //socket ID
 UDTSOCKET client_control;
@@ -102,6 +101,8 @@ int main(int argc, char* argv[])
         cout << "usage: ./udtclient [server_ip] [server_port] [MSS] [mode(1 or 2)]" << endl;
         return 0;
     }
+    memset(method, '\0', sizeof(method));
+    stpcpy(method, "UDT");
 
     mss = atoi(argv[3]); // 1us * 1Ms => 1s (because usleep use u as unit)
     cout << "mss: " << mss << endl;
@@ -214,12 +215,12 @@ int main(int argc, char* argv[])
     // exchange data packet
     client_data = UDT::socket(local->ai_family, local->ai_socktype, local->ai_protocol);
      
-   // UDT Options
-   //UDT::setsockopt(client_data, 0, UDT_RCVTIMEO, &recv_timeo, sizeof(int));
-    UDT::setsockopt(client_data, 0, UDT_CC, new CCCFactory<CUDPBlast>, sizeof(CCCFactory<CUDPBlast>));
-    UDT::setsockopt(client_data, 0, UDT_MSS, new int(mss), sizeof(int));
-   //UDT::setsockopt(client_data, 0, UDT_SNDBUF, new int(10000000), sizeof(int));
-   //UDT::setsockopt(client_data, 0, UDP_SNDBUF, new int(10000000), sizeof(int));
+    // UDT Options
+    //UDT::setsockopt(client_data, 0, UDT_RCVTIMEO, &recv_timeo, sizeof(int));
+    UDT::setsockopt(client_data, 0, UDT_CC, new CCCFactory<CTCP>, sizeof(CCCFactory<CTCP>));
+    //UDT::setsockopt(client_data, 0, UDT_MSS, new int(mss), sizeof(int));
+    //UDT::setsockopt(client_data, 0, UDT_SNDBUF, new int(10000000), sizeof(int));
+    //UDT::setsockopt(client_data, 0, UDP_SNDBUF, new int(10000000), sizeof(int));
    	int sndbuf = 0;
     int oplen = sizeof(int);
     if (UDT::ERROR == UDT::setsockopt(client_data, 0, UDT_MSS, new int(mss), sizeof(int)))
@@ -244,7 +245,7 @@ int main(int argc, char* argv[])
         return 0;
     }
   
-    cout << "IP "<<argv[1] << " " << port_data_socket.c_str() << endl;
+    cout << "IP "<< argv[1] << " " << port_data_socket.c_str() << endl;
     fflush(stdout);
      sndbuf = 0;
     // connect to the server, implict bind
@@ -369,6 +370,10 @@ void close_connection()
     int result_fd;
     char str[100];
     // record result
+    fstream fout("test.csv", ios::out|ios::app);
+    fout << endl << endl;
+    fout << "Method," << method << endl;
+    fout << "MSS," << mss << endl;
     result_fd = open("result.txt", O_RDWR | O_CREAT | O_APPEND, S_IRWXU);
     memset(str, '\0', 100);
 
@@ -379,14 +384,16 @@ void close_connection()
     //總執行時間 - 檔案寫入時間 - 最後等待到期10秒 = 實際執行接收時間
     execute_time = (double)(new_time - old_time)/ticks - 20; 
     printf("Total Execute Time (sec): %2.2f\n", execute_time);
-
+    fout << "執行時間," << execute_time << endl;
     sprintf(str, "UDT\nMss: %d\nTotal Execute Time (sec) : %f\n\n", mss, execute_time);
     if(write(result_fd, str, strlen(str)) < 0)
     {
         cout << "write error\n";
         exit(1);
     }
+    fout << endl << endl;
     close(result_fd);
+    fout.close();
     //printf("num_packets(from server): %d, total_recv_packets: %d\n", num_packets, total_recv_packets);
     //printf("Total_recv_size: %d\n", total_recv_size); 
     
