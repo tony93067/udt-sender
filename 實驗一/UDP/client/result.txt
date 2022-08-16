@@ -1,0 +1,8 @@
+Execute Time : 0.000000, Data Loss : 0.000000
+
+Execute Time : 0.000000, Data Loss : 0.000000
+
+Execute Time : 0.000000, Data Loss : 0.000000
+
+Execute Time : -3.000000, Data Loss : 0.000000
+

@@ -43,6 +43,11 @@ MSS,1500
 執行時間,206.38
 ,
 ,
-Method,UDT
+Method,CTCP
 MSS,750
 執行時間,258.41
+,
+,
+Method,UDT
+MSS,1500
+執行時間,43.7

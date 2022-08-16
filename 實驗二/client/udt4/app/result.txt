@@ -74,3 +74,15 @@ UDT
 Mss: 100
 Total Execute Time (sec) : 15.010000
 
+UDT
+Mss: 1500
+Total Execute Time (sec) : 43.700000
+
+UDT
+Mss: 1500
+Total Execute Time (sec) : 228.160000
+
+UDT
+Mss: 1500
+Total Execute Time (sec) : 174.390000
+

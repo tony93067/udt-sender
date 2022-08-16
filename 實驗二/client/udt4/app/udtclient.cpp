@@ -51,8 +51,6 @@ struct tms time_w_start, time_w_end;
 double ticks;
 // packets
 int total_recv_size = 0;
-int tmp_total_recv_size = 0;
-int final_total_recv_size = 0;
 int num_packets = 0;
 int seq_client = 0;
 int totalbytes = 0;
@@ -102,14 +100,13 @@ int main(int argc, char* argv[])
         return 0;
     }
     memset(method, '\0', sizeof(method));
-    stpcpy(method, "UDT");
+    stpcpy(method, "CUDPBlast");
 
     mss = atoi(argv[3]); // 1us * 1Ms => 1s (because usleep use u as unit)
     cout << "mss: " << mss << endl;
 
     mode = atoi(argv[4]);
-    cout << "Choose mode: " << mode << endl;
-
+    
     // use this function to initialize the UDT library
     UDT::startup();
 
@@ -192,11 +189,9 @@ int main(int argc, char* argv[])
     string service_data(DATA_DEFAULT_PORT); 
     if(rs > 0)
     {
-        //cout << "rs(port_data_socket): " << rs << endl;
         cout << "port_data_socket: " << port_data_socket.c_str() << endl;
         service_data = port_data_socket;
-        //cout << "service_data: " << port_data_socket.c_str() << endl;
-        //fflush(stdout);
+        
     }
 
     /* create data tranfer socket(using partial reliable message mode) */
@@ -217,7 +212,7 @@ int main(int argc, char* argv[])
      
     // UDT Options
     //UDT::setsockopt(client_data, 0, UDT_RCVTIMEO, &recv_timeo, sizeof(int));
-    UDT::setsockopt(client_data, 0, UDT_CC, new CCCFactory<CTCP>, sizeof(CCCFactory<CTCP>));
+    UDT::setsockopt(client_data, 0, UDT_CC, new CCCFactory<CUDPBlast>, sizeof(CCCFactory<CUDPBlast>));
     //UDT::setsockopt(client_data, 0, UDT_MSS, new int(mss), sizeof(int));
     //UDT::setsockopt(client_data, 0, UDT_SNDBUF, new int(10000000), sizeof(int));
     //UDT::setsockopt(client_data, 0, UDP_SNDBUF, new int(10000000), sizeof(int));
@@ -247,7 +242,7 @@ int main(int argc, char* argv[])
   
     cout << "IP "<< argv[1] << " " << port_data_socket.c_str() << endl;
     fflush(stdout);
-     sndbuf = 0;
+    sndbuf = 0;
     // connect to the server, implict bind
     if (UDT::ERROR == UDT::connect(client_data, local->ai_addr, local->ai_addrlen))
     {
@@ -255,11 +250,14 @@ int main(int argc, char* argv[])
         return 0;
     }
     // using CC method
-    //CUDPBlast* cchandle = NULL;
-    //int temp;
-    //UDT::getsockopt(client, 0, UDT_CC, &cchandle, &temp);
-    //if (NULL != cchandle)
-    //    cchandle->setRate(500);
+    CUDPBlast* cchandle = NULL;
+    int temp;
+    UDT::getsockopt(client_data, 0, UDT_CC, &cchandle, &temp);
+    if (NULL != cchandle)
+    {
+        cout << "enter set rate" << endl;
+        cchandle->setRate(500);
+    }
     
     if (UDT::ERROR == UDT::getsockopt(client_data, 0, UDT_SNDBUF, (char *)&sndbuf, &oplen))
     {
@@ -370,7 +368,7 @@ void close_connection()
     int result_fd;
     char str[100];
     // record result
-    fstream fout("test.csv", ios::out|ios::app);
+    fstream fout("diffgs_test.csv", ios::out|ios::app);
     fout << endl << endl;
     fout << "Method," << method << endl;
     fout << "MSS," << mss << endl;
