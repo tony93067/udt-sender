@@ -17,6 +17,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/times.h>
+#include <sys/mman.h>
 
 #include "cc.h"
 
@@ -66,6 +67,9 @@ int total_timer_count = 0;
 // finish connection
 bool timeout = false;
 
+// used to get mmap return address
+void* file_addr;
+
 int num_timeo = 0;
 int continuous_timeo = 0;
 
@@ -100,7 +104,7 @@ int main(int argc, char* argv[])
         return 0;
     }
     memset(method, '\0', sizeof(method));
-    stpcpy(method, "CUDPBlast");
+    stpcpy(method, "UDT");
 
     mss = atoi(argv[3]); // 1us * 1Ms => 1s (because usleep use u as unit)
     cout << "mss: " << mss << endl;
@@ -110,7 +114,7 @@ int main(int argc, char* argv[])
     // use this function to initialize the UDT library
     UDT::startup();
 
-    struct addrinfo hints, *local, *peer;
+    struct addrinfo hints, *local;
 
     memset(&hints, 0, sizeof(struct addrinfo));
 
@@ -194,7 +198,7 @@ int main(int argc, char* argv[])
         
     }
 
-    /* create data tranfer socket(using partial reliable message mode) */
+    /* create data tranfer socket(using reliable stream mode) */
     // reset hints
     memset(&hints, 0, sizeof(struct addrinfo));
 
@@ -212,12 +216,14 @@ int main(int argc, char* argv[])
      
     // UDT Options
     //UDT::setsockopt(client_data, 0, UDT_RCVTIMEO, &recv_timeo, sizeof(int));
-    UDT::setsockopt(client_data, 0, UDT_CC, new CCCFactory<CUDPBlast>, sizeof(CCCFactory<CUDPBlast>));
+    //UDT::setsockopt(client_data, 0, UDT_CC, new CCCFactory<CUDPBlast>, sizeof(CCCFactory<CUDPBlast>));
     //UDT::setsockopt(client_data, 0, UDT_MSS, new int(mss), sizeof(int));
     //UDT::setsockopt(client_data, 0, UDT_SNDBUF, new int(10000000), sizeof(int));
     //UDT::setsockopt(client_data, 0, UDP_SNDBUF, new int(10000000), sizeof(int));
    	int sndbuf = 0;
     int oplen = sizeof(int);
+
+    // setting Maximum Segment Size
     if (UDT::ERROR == UDT::setsockopt(client_data, 0, UDT_MSS, new int(mss), sizeof(int)))
     {
         cout << "setsockopt(mss): " << UDT::getlasterror().getErrorMessage() << endl;
@@ -234,21 +240,24 @@ int main(int argc, char* argv[])
         cout << "UDT MSS : " << sndbuf << endl;
     }
    
-    if (0 != getaddrinfo(argv[1], port_data_socket.c_str(), &hints, &peer))
+    /*if (0 != getaddrinfo(argv[1], port_data_socket.c_str(), &hints, &peer))
     {
         cout << "incorrect server/peer address. " << argv[1] << ":" << argv[2] << endl;
         return 0;
-    }
+    }*/
   
     cout << "IP "<< argv[1] << " " << port_data_socket.c_str() << endl;
     fflush(stdout);
-    sndbuf = 0;
+
     // connect to the server, implict bind
     if (UDT::ERROR == UDT::connect(client_data, local->ai_addr, local->ai_addrlen))
     {
         cout << "connect(client_data): " << UDT::getlasterror().getErrorMessage() << endl;
         return 0;
     }
+    freeaddrinfo(local);
+    cout << "connect to Server: " << argv[1] << ", port: " << port_data_socket.c_str() << endl;
+    /*
     // using CC method
     CUDPBlast* cchandle = NULL;
     int temp;
@@ -258,7 +267,9 @@ int main(int argc, char* argv[])
         cout << "enter set rate" << endl;
         cchandle->setRate(500);
     }
-    
+    */
+    // Getting buffer info
+    sndbuf = 0;
     if (UDT::ERROR == UDT::getsockopt(client_data, 0, UDT_SNDBUF, (char *)&sndbuf, &oplen))
     {
         printf("getsockopt error\n");
@@ -290,68 +301,69 @@ int main(int argc, char* argv[])
     {
         cout << "UDP Recv Buffer size : " << sndbuf << endl;
     }
-    sndbuf = 0;
-    // 設定20秒未接收到封包則, recv function return 0
-    if (UDT::ERROR == UDT::setsockopt(client_data, 0, UDT_RCVTIMEO, new int(20000), sizeof(int)))
-    {
-        cout << "set RCV timeout error" << endl;
-    }else
-    {
-        UDT::getsockopt(client_data, 0, UDT_RCVTIMEO, (char *)&sndbuf, &oplen);
-        cout << "Set RCV timeout : "<< sndbuf << endl;
-    }
     //freeaddrinfo(peer);
-    freeaddrinfo(local);
-    cout << "connect to Server: " << argv[1] << ", port: " << port_data_socket.c_str() << endl;
-  
-    // Data Receiving
-    int rsize = 0;
-    int j = 0; // used to set start time
-    int fd; // use to open file
-    fd = open("file.txt", O_RDWR | O_CREAT | O_TRUNC | O_APPEND, S_IRWXU);
+    
+
+    //-----------------------------------------------------------------------------------
+    // Data Sending
+    int i = 0;
+    int fd;
+    int ssize = 0;
+    int total_send_size = 0;
+    struct stat sb;
+
+    fd = open("/home/tony/實驗code/論文code/file.txt", O_RDONLY, S_IRWXU);
+    // get file info
+    if(fstat(fd, &sb) == -1)
+    {
+        printf("fstat error\n");
+        exit(1);
+    }
+    // map file to memory
+    file_addr = mmap(NULL, sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+    if(file_addr == MAP_FAILED)
+    {
+        printf("mmap error\n");
+        exit(1);
+    }
+    int transmit_size = 0;
+    transmit_size = sb.st_size;
+
     while(1)
     {
-        // reset recv_buf.data
-        memset(recv_buf, '\0',sizeof(recv_buf));
-        // 未收到資料時回傳 -1
-        if(UDT::ERROR == (rsize = UDT::recv(client_data, (char *)recv_buf, sizeof(recv_buf), 0))) 
+        // record start time when receive first data packet
+        if(i == 0)
         {
-            cout << "recv:" << UDT::getlasterror().getErrorMessage() << endl;
-            cout << rsize << endl;
-        }
-        else
-        {
-            //cout << "rsize : " << rsize << endl;
-            // record start time when receive first data packet
-            if(j == 0)
+            //start time
+            if((old_time = times(&time_start)) == -1)
             {
-                // record start time
-                if((old_time = times(&time_start)) == -1)
-                {
-                    cout << "time error" << endl;
-                    exit(1);
-                }
-                // create thread to monitor socket(client_data)
-                //pthread_create(new pthread_t, NULL, monitor, &client_data);
-            }
-            
-            if(write(fd, recv_buf, rsize) == -1)
-            {
-                cout << "write error" << endl;
+                printf("time error\n");
                 exit(1);
             }
-            total_recv_size += rsize ;
+            pthread_create(new pthread_t, NULL, monitor, &client_data);
         }
-        // timeout 到期，未收到封包
-        if(rsize == -1)
+        
+        if(ssize < sb.st_size)
         {
-            // 接收完成, 關閉檔案
-            cout << "receiving finish & close file" << endl;
-            close(fd);
-            break;
+            if(UDT::ERROR == (ss = UDT::send(client_data, (char *)file_addr + ssize, transmit_size, 0))) 
+            {
+                cout << "send:" << UDT::getlasterror().getErrorMessage() << endl;
+                exit(1);
+            }
+            else
+            {
+                cout << "ss " << ss << endl;
+                ssize += ss;
+                transmit_size -= ss;
+                //if((sb.st_size - ssize) < MSS)
+                //    MSS = sb.st_size -ssize;
+            }
         }
-        j++;
-
+        total_send_size = ssize;
+        if(ssize == sb.st_size)
+            break;
+        
+        i++;
     }
     
     //finish time
@@ -360,6 +372,8 @@ int main(int argc, char* argv[])
         printf("time error\n");
         exit(1);
     }
+    // close file
+    close(fd);
     close_connection();
     return 1;
 }
@@ -380,7 +394,7 @@ void close_connection()
     printf("Client Seq: %d\n", seq_client);
 
     //總執行時間 - 檔案寫入時間 - 最後等待到期10秒 = 實際執行接收時間
-    execute_time = (double)(new_time - old_time)/ticks - 20; 
+    execute_time = (double)(new_time - old_time)/ticks; 
     printf("Total Execute Time (sec): %2.2f\n", execute_time);
     fout << "執行時間," << execute_time << endl;
     sprintf(str, "UDT\nMss: %d\nTotal Execute Time (sec) : %f\n\n", mss, execute_time);
@@ -392,12 +406,11 @@ void close_connection()
     fout << endl << endl;
     close(result_fd);
     fout.close();
-    //printf("num_packets(from server): %d, total_recv_packets: %d\n", num_packets, total_recv_packets);
-    //printf("Total_recv_size: %d\n", total_recv_size); 
     
+    // close control message exchange
     throughput_bytes = (double)total_recv_size / execute_time;
     print_throughput(throughput_bytes);  
-    cout << "send END_TRANS" << endl;
+    /*cout << "send END_TRANS" << endl;
     char control_data3[sizeof(END_TRANS)];
     int ss_control_data3 = 0;
     strcpy(control_data3,END_TRANS);
@@ -406,16 +419,16 @@ void close_connection()
         cout << "send:" << UDT::getlasterror().getErrorMessage() << endl;
         exit(1);
     }
+    */
+    //if(ss_control_data3 > 0)
+    //{
+    cout << "END connection" << endl;
+    UDT::close(client_control);
+    UDT::close(client_data);
     
-    if(ss_control_data3 > 0)
-    {
-        cout << "END connection" << endl;
-        UDT::close(client_control);
-        UDT::close(client_data);
-    
-        // use this function to release the UDT library
-        UDT::cleanup();
-    }
+    // use this function to release the UDT library
+    UDT::cleanup();
+    //}
     
 }
 
@@ -450,25 +463,24 @@ void* monitor(void* s)
 DWORD WINAPI monitor(LPVOID s)
 #endif
 {
+    char method[15];
     UDTSOCKET u = *(UDTSOCKET*)s;
-
+    int zero_times = 0;
     UDT::TRACEINFO perf;
-    int monitor_fd;
-    char str[100];
+    fstream fout("test.csv", ios::out|ios::app);
     
+    memset(method, '\0', sizeof(method));
+    strcpy(method, "UDT");
+    fout << endl << endl;
+    fout << "Method," << method << endl;
     // record monitor data
-    monitor_fd = open("monitor.txt", O_RDWR | O_CREAT | O_APPEND, S_IRWXU);
-    memset(str, '\0', 100);
-    strcpy(str, "SendRate(Mb/s)\tRTT(ms)\tCWnd\tPktSndPeriod(us)\tRecvACK\tRecvNAK");
-	if(write(monitor_fd, str, strlen(str)) < 0)
-    {
-        cout << "write error" << endl;
-        exit(1);
-    }
-    cout << "SendRate(Mb/s)\tRTT(ms)\tCWnd\tPktSndPeriod(us)\tRecvACK\tRecvNAK" << endl;
+    //monitor_fd = open("monitor.txt", O_RDWR | O_CREAT | O_APPEND, S_IRWXU);
+    //sprintf(str, "MSS : %d\nSendRate(Mb/s)\tRTT(ms)\tCWnd\tPktSndPeriod(us)\tRecvACK\tRecvNAK\n", MSS);
+    fout << "MSS," << mss << endl;
+    fout << "SendRate(Mb/s)," << "ReceiveRate(Mb/s)," << "RTT(ms)," << "CWnd," << "FlowWindow," << "PktSndPeriod(us)," << "RecvACK," << "RecvNAK," << "EstimatedBandwidth(Mb/s)" << endl;
+    //cout << "SendRate(Mb/s)\tRTT(ms)\tCWnd\tPktSndPeriod(us)\tRecvACK\tRecvNAK" << endl;
     while (true)
     {
-        memset(str, '\0', 100);
         #ifndef WIN32
             sleep(1);
         #else
@@ -480,26 +492,27 @@ DWORD WINAPI monitor(LPVOID s)
             cout << "perfmon: " << UDT::getlasterror().getErrorMessage() << endl;
             break;
         }
-        sprintf(str, "%f\t\t%f\t%d\t%f\t\t\t%d\t%d\n", perf.mbpsSendRate, 
-            perf.msRTT, perf.pktCongestionWindow, perf.usPktSndPeriod, perf.pktRecvACK, perf.pktRecvNAK);
-        if(write(monitor_fd, str, strlen(str)) < 0)
+        
+        fout << perf.mbpsSendRate << "," << perf.mbpsRecvRate << "," << perf.msRTT << "," << perf.pktCongestionWindow << ","
+            << perf.pktFlowWindow << "," << perf.usPktSndPeriod << "," << perf.pktRecvACK << "," << perf.pktRecvNAK << "," << perf.mbpsBandwidth << endl;
+        if(perf.mbpsSendRate == 0 && perf.pktRecvACK == 0 && perf.pktRecvNAK == 0)
         {
-            cout << "write error" << endl;
-            exit(1);
+            zero_times++;
+        }else
+        {
+            zero_times = 0;
         }
-        cout << perf.mbpsSendRate << "\t\t" 
+        if(zero_times >= 5)
+            break;
+        /*cout << perf.mbpsSendRate << "\t\t" 
             << perf.msRTT << "\t" 
             << perf.pktCongestionWindow << "\t" 
             << perf.usPktSndPeriod << "\t\t\t" 
             << perf.pktRecvACK << "\t" 
-            << perf.pktRecvNAK << endl;
+            << perf.pktRecvNAK << endl;*/
     }
-    if(write(monitor_fd, "\n", sizeof("\n")) < 0)
-    {
-        cout << "write error" << endl;
-        exit(1);
-    }
-    close(monitor_fd);
+    fout << endl << endl;
+    fout.close();
     #ifndef WIN32
         return NULL;
     #else

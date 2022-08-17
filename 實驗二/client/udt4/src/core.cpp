@@ -1609,10 +1609,6 @@ void CUDT::sample(CPerfMon* perf, bool clear)
    perf->pktSentNAKTotal = m_iSentNAKTotal;
    perf->pktRecvNAKTotal = m_iRecvNAKTotal;
    perf->usSndDurationTotal = m_llSndDurationTotal;
-   cout << "m_llTraceSent " << m_llTraceSent << endl;
-   cout << "m_iPayloadSize " << m_iPayloadSize << endl;
-   cout << "m_ullCPUFrequency " << m_ullCPUFrequency << endl;
-   cout << "currtime " << currtime << endl;
    double interval = double(currtime - m_LastSampleTime);
    perf->mbpsSendRate = double(m_llTraceSent) * m_iPayloadSize * 8.0 / interval;
    perf->mbpsRecvRate = double(m_llTraceRecv) * m_iPayloadSize * 8.0 / interval;

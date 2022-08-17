@@ -22,10 +22,7 @@ UDT
 Mss: 1500
 Total Execute Time (sec) : 257.440000
 
-UDT
-Mss: 1500
-Total Execute Time (sec) : 294.020000
-
+// UDT 
 UDT
 Mss: 1500
 Total Execute Time (sec) : 269.510000
@@ -38,15 +35,16 @@ UDT
 Mss: 100
 Total Execute Time (sec) : 461.740000
 
-UDT
+// CUDPBLAST
+CUDPBLAST
 Mss: 1500
 Total Execute Time (sec) : 332.050000
 
-UDT
+CUDPBLAST
 Mss: 750
 Total Execute Time (sec) : 334.670000
 
-UDT
+CUDPBLAST
 Mss: 100
 Total Execute Time (sec) : 318.350000
 
@@ -62,27 +60,13 @@ UDT
 Mss: 750
 Total Execute Time (sec) : 7.600000
 
-UDT
+// CTCP
+CTCP
 Mss: 1500
 Total Execute Time (sec) : 206.380000
 
-UDT
+//CTCP
 Mss: 750
 Total Execute Time (sec) : 258.410000
 
-UDT
-Mss: 100
-Total Execute Time (sec) : 15.010000
-
-UDT
-Mss: 1500
-Total Execute Time (sec) : 43.700000
-
-UDT
-Mss: 1500
-Total Execute Time (sec) : 228.160000
-
-UDT
-Mss: 1500
-Total Execute Time (sec) : 174.390000
 
