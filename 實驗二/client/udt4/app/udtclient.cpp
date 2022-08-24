@@ -51,8 +51,7 @@ struct tms time_start,time_end;
 struct tms time_w_start, time_w_end;
 double ticks;
 // packets
-int total_recv_size = 0;
-int num_packets = 0;
+int total_send_size = 0;
 int seq_client = 0;
 int totalbytes = 0;
 double execute_time;
@@ -73,10 +72,12 @@ void* file_addr;
 int num_timeo = 0;
 int continuous_timeo = 0;
 
-char method[15];
-
+// congestion control mode : 1 : UDT, 2 : CTCP, 3 CUDPBlast
 int mode;
+// Maximu Segment Size
 int mss = 0;
+// Congetion contorl method
+char method[15];
 //socket ID
 UDTSOCKET client_control;
 UDTSOCKET client_data;
@@ -85,6 +86,9 @@ char recv_buf[BUFFER_SIZE];
 // use to check if pkt is in-order or out-of-order when arrive receiver side
 int current_seq;
 int num_out_of_order = 0;
+
+//thread variable
+pthread_t t1;
 
 #ifndef WIN32
 void* monitor(void*);
@@ -100,17 +104,22 @@ int main(int argc, char* argv[])
 {
     if ((5 != argc) || (0 == atoi(argv[2])) || (atoi(argv[4]) != 1 && atoi(argv[4]) != 2))
     {
-        cout << "usage: ./udtclient [server_ip] [server_port] [MSS] [mode(1 or 2)]" << endl;
+        cout << "usage: ./udtclient [server_ip] [server_port] [MSS] [mode(1:UDT, 2:CTCP, 3:CUDPBlast)]" << endl;
         return 0;
     }
-    memset(method, '\0', sizeof(method));
-    stpcpy(method, "UDT");
 
     mss = atoi(argv[3]); // 1us * 1Ms => 1s (because usleep use u as unit)
     cout << "mss: " << mss << endl;
 
     mode = atoi(argv[4]);
-    
+    memset(method, '\0', sizeof(method));
+    if(mode == 1)
+        strcpy(method, "UDT");
+    else if(mode == 2)
+        strcpy(method, "CTCP");
+    else
+        strcpy(method, "CUDPBlast");
+
     // use this function to initialize the UDT library
     UDT::startup();
 
@@ -216,7 +225,17 @@ int main(int argc, char* argv[])
      
     // UDT Options
     //UDT::setsockopt(client_data, 0, UDT_RCVTIMEO, &recv_timeo, sizeof(int));
-    //UDT::setsockopt(client_data, 0, UDT_CC, new CCCFactory<CUDPBlast>, sizeof(CCCFactory<CUDPBlast>));
+    if (moe == 2)
+    {
+        UDT::setsockopt(client_data, 0, UDT_CC, new CCCFactory<CTCP>, sizeof(CCCFactory<CTCP>));
+        cout << "Setting Congestion Control Method CTCP" << endl;
+
+    }else if(mode == 3)
+    {
+        UDT::setsockopt(client_data, 0, UDT_CC, new CCCFactory<CUDPBlast>, sizeof(CCCFactory<CUDPBlast>));
+        cout << "Setting Congestion Control Method CUDPBlast" << endl;
+
+    }
     //UDT::setsockopt(client_data, 0, UDT_MSS, new int(mss), sizeof(int));
     //UDT::setsockopt(client_data, 0, UDT_SNDBUF, new int(10000000), sizeof(int));
     //UDT::setsockopt(client_data, 0, UDP_SNDBUF, new int(10000000), sizeof(int));
@@ -257,8 +276,9 @@ int main(int argc, char* argv[])
     }
     freeaddrinfo(local);
     cout << "connect to Server: " << argv[1] << ", port: " << port_data_socket.c_str() << endl;
-    /*
+    
     // using CC method
+    /*
     CUDPBlast* cchandle = NULL;
     int temp;
     UDT::getsockopt(client_data, 0, UDT_CC, &cchandle, &temp);
@@ -309,7 +329,6 @@ int main(int argc, char* argv[])
     int i = 0;
     int fd;
     int ssize = 0;
-    int total_send_size = 0;
     struct stat sb;
 
     fd = open("/home/tony/實驗code/論文code/file.txt", O_RDONLY, S_IRWXU);
@@ -328,7 +347,6 @@ int main(int argc, char* argv[])
     }
     int transmit_size = 0;
     transmit_size = sb.st_size;
-
     while(1)
     {
         // record start time when receive first data packet
@@ -340,7 +358,7 @@ int main(int argc, char* argv[])
                 printf("time error\n");
                 exit(1);
             }
-            pthread_create(new pthread_t, NULL, monitor, &client_data);
+            pthread_create(&t1, NULL, monitor, &client_data);
         }
         
         if(ssize < sb.st_size)
@@ -352,11 +370,8 @@ int main(int argc, char* argv[])
             }
             else
             {
-                cout << "ss " << ss << endl;
                 ssize += ss;
                 transmit_size -= ss;
-                //if((sb.st_size - ssize) < MSS)
-                //    MSS = sb.st_size -ssize;
             }
         }
         total_send_size = ssize;
@@ -365,7 +380,7 @@ int main(int argc, char* argv[])
         
         i++;
     }
-    
+    cout << "end sending" << endl;
     //finish time
     if((new_time = times(&time_end)) == -1)
     {
@@ -379,36 +394,28 @@ int main(int argc, char* argv[])
 }
 void close_connection()
 {
-    int result_fd;
-    char str[100];
     // record result
-    fstream fout("diffgs_test.csv", ios::out|ios::app);
-    fout << endl << endl;
-    fout << "Method," << method << endl;
-    fout << "MSS," << mss << endl;
-    result_fd = open("result.txt", O_RDWR | O_CREAT | O_APPEND, S_IRWXU);
-    memset(str, '\0', 100);
-
+    fstream fout("coding_test.csv", ios::out|ios::app);
+    
     ticks = sysconf(_SC_CLK_TCK);
     printf("\n[Close Connection]\n");
     printf("Client Seq: %d\n", seq_client);
 
-    //總執行時間 - 檔案寫入時間 - 最後等待到期10秒 = 實際執行接收時間
     execute_time = (double)(new_time - old_time)/ticks; 
-    printf("Total Execute Time (sec): %2.2f\n", execute_time);
-    fout << "執行時間," << execute_time << endl;
-    sprintf(str, "UDT\nMss: %d\nTotal Execute Time (sec) : %f\n\n", mss, execute_time);
-    if(write(result_fd, str, strlen(str)) < 0)
-    {
-        cout << "write error\n";
-        exit(1);
-    }
+    printf("Total Sending Time (sec): %2.2f\n", execute_time);
+    
+    //sprintf(str, "UDT\nMss: %d\nTotal Execute Time (sec) : %f\n\n", mss, execute_time);
+    
+    // write info and close file
     fout << endl << endl;
-    close(result_fd);
+    fout << "Method," << method << endl;
+    fout << "MSS," << mss << endl;
+    fout << "發送時間," << execute_time << endl;
+    fout << endl << endl;
     fout.close();
     
     // close control message exchange
-    throughput_bytes = (double)total_recv_size / execute_time;
+    throughput_bytes = (double)total_send_size / execute_time;
     print_throughput(throughput_bytes);  
     /*cout << "send END_TRANS" << endl;
     char control_data3[sizeof(END_TRANS)];
@@ -423,6 +430,7 @@ void close_connection()
     //if(ss_control_data3 > 0)
     //{
     cout << "END connection" << endl;
+    pthread_join(t1, NULL);
     UDT::close(client_control);
     UDT::close(client_data);
     
@@ -463,22 +471,17 @@ void* monitor(void* s)
 DWORD WINAPI monitor(LPVOID s)
 #endif
 {
-    char method[15];
+    
     UDTSOCKET u = *(UDTSOCKET*)s;
     int zero_times = 0;
     UDT::TRACEINFO perf;
-    fstream fout("test.csv", ios::out|ios::app);
+
+    fstream fout("coding_test_monitor.csv", ios::out|ios::app);
     
-    memset(method, '\0', sizeof(method));
-    strcpy(method, "UDT");
     fout << endl << endl;
     fout << "Method," << method << endl;
-    // record monitor data
-    //monitor_fd = open("monitor.txt", O_RDWR | O_CREAT | O_APPEND, S_IRWXU);
-    //sprintf(str, "MSS : %d\nSendRate(Mb/s)\tRTT(ms)\tCWnd\tPktSndPeriod(us)\tRecvACK\tRecvNAK\n", MSS);
     fout << "MSS," << mss << endl;
     fout << "SendRate(Mb/s)," << "ReceiveRate(Mb/s)," << "RTT(ms)," << "CWnd," << "FlowWindow," << "PktSndPeriod(us)," << "RecvACK," << "RecvNAK," << "EstimatedBandwidth(Mb/s)" << endl;
-    //cout << "SendRate(Mb/s)\tRTT(ms)\tCWnd\tPktSndPeriod(us)\tRecvACK\tRecvNAK" << endl;
     while (true)
     {
         #ifndef WIN32

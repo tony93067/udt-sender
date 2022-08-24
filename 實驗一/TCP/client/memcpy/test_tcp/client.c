@@ -73,7 +73,7 @@ int main(int argc, char **argv)
     int fd;
     int len;
     // open file 
-    fd = open("output.txt", O_RDWR | O_CREAT | O_TRUNC | O_APPEND, S_IRWXU);
+    fd = open("file.txt", O_RDWR | O_CREAT | O_TRUNC | O_APPEND, S_IRWXU);
     if (fd == -1) {
         perror("open\n");
         exit(EXIT_FAILURE);

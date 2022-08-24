@@ -48,18 +48,6 @@ CUDPBLAST
 Mss: 100
 Total Execute Time (sec) : 318.350000
 
-UDT
-Mss: 100
-Total Execute Time (sec) : 10.160000
-
-UDT
-Mss: 1500
-Total Execute Time (sec) : 202.060000
-
-UDT
-Mss: 750
-Total Execute Time (sec) : 7.600000
-
 // CTCP
 CTCP
 Mss: 1500
