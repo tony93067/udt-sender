@@ -12,11 +12,10 @@
 #include <sys/times.h>
 #include <string.h>
 #include <arpa/inet.h>
+#include <sys/mman.h>
 
 #define DIE(x) perror(x),exit(1)
 #define PORT 8888
-#define SNAME_SIZE 1024
-#define BUFFER_SIZE 10000
 
 int main(int argc, char **argv)
 {
@@ -24,29 +23,24 @@ int main(int argc, char **argv)
     clock_t old,new;//use for count executing time
     struct tms time_start,time_end;//use for count executing time
     double ticks;
+    struct stat sb;
     int sd;
-    struct hostent *host;
-    char server_name[SNAME_SIZE];
-    char buffer[BUFFER_SIZE];
-    int recv_size = 0;
-    int recv_packet = 0;
-
-    printf("sizeof(buffer): %ld\n",sizeof(buffer));
+    
+    int send_size = 0;
+    // used to get mmap return virtual address
+    char* file_addr;
 
     if(argc != 2)
     {
         printf("Usage: %s <server_ip>\n",argv[0]);
         exit(1);
     }
-
-    strcpy(server_name,argv[1]);//set server
     
     /* Set up destination address. */
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = inet_addr(argv[1]);
-    //host = gethostbyname(server_name);
-    server.sin_port = htons(PORT);    
-    //memcpy((char*)&server.sin_addr,host->h_addr_list[0],host->h_length);
+    server.sin_port = htons(PORT);
+    
     printf("Client Socket Open:\n");
     sd = socket(AF_INET,SOCK_STREAM,0);
     if(sd < 0)
@@ -60,7 +54,7 @@ int main(int argc, char **argv)
         DIE("connect");
     }
 
-    printf("Start Receiving!\n");
+    printf("Start Sending!\n");
 
     /*receive packet*/
     //start time
@@ -72,42 +66,41 @@ int main(int argc, char **argv)
     int total_recv_size = 0;
     int fd;
     int len;
+    FILE *ex = NULL;
+    ex = fopen("test.csv", "a");
     // open file 
-    fd = open("file.txt", O_RDWR | O_CREAT | O_TRUNC | O_APPEND, S_IRWXU);
+    fd = open("../../../../../file.txt", O_RDONLY, S_IRWXU);
     if (fd == -1) {
         perror("open\n");
         exit(EXIT_FAILURE);
     }
-    while(1)
+    // get file info
+    if(fstat(fd, &sb) == -1)
     {
-        memset(buffer, '\0', BUFFER_SIZE);
-        if((recv_size = recv(sd, buffer,sizeof(buffer),0)) < 0)
-        {
-            DIE("recv");
-        }
-        else
-        {
-            //printf("recv size %d\n", recv_size); 
-            if (recv_size > 0)
-            {
-                //printf("%s %d\n", buffer, recv_size);
-                // 寫入檔案
-                if(write(fd, buffer, recv_size) == -1)
-                {
-                    printf("write error\n");
-                    exit(1);
-                }
-                total_recv_size += recv_size;
-            }
-
-        }
-
-        if(recv_size == 0)//last packet, break loop
-        {
-            close(fd);
-            break;
-        }
+        printf("fstat error\n");
+        exit(1);
     }
+    
+    // map file to memory
+    file_addr = mmap(NULL, sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+    if(file_addr == MAP_FAILED)
+    {
+        printf("mmap error\n");
+        exit(1);
+    }
+    
+    
+    if((send_size = send(sd, (char *)file_addr, sb.st_size, 0)) < 0)
+    {
+        DIE("send");
+    }
+    
+    if(munmap(file_addr, sb.st_size) == -1)
+    {
+        printf("munmap error\n");
+        exit(1);
+    }
+    close(fd);
     //finish time
     if((new = times(&time_end)) == -1)
     {
@@ -117,8 +110,11 @@ int main(int argc, char **argv)
     
     /*executing time*/
     ticks=sysconf(_SC_CLK_TCK);
-    printf("Run Time: %2.2f\n",(double)(new-old)/ticks);
-    printf("Recv Size: %d\n", total_recv_size);
+    printf("Send Time: %2.2f\n",(double)(new-old)/ticks);
+    printf("send Size: %d\n", send_size);
+    fprintf(ex, "%s\n", "TCP");
+    fprintf(ex, "%s\t%f\n", "Send Time", (double)(new-old)/ticks);
+    fclose(ex);
     //close connection
     close(sd);
 

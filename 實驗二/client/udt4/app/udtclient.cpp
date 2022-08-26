@@ -18,6 +18,7 @@
 #include <fcntl.h>
 #include <sys/times.h>
 #include <sys/mman.h>
+#include <fstream>
 
 #include "cc.h"
 
@@ -225,7 +226,7 @@ int main(int argc, char* argv[])
      
     // UDT Options
     //UDT::setsockopt(client_data, 0, UDT_RCVTIMEO, &recv_timeo, sizeof(int));
-    if (moe == 2)
+    if (mode == 2)
     {
         UDT::setsockopt(client_data, 0, UDT_CC, new CCCFactory<CTCP>, sizeof(CCCFactory<CTCP>));
         cout << "Setting Congestion Control Method CTCP" << endl;
@@ -235,6 +236,9 @@ int main(int argc, char* argv[])
         UDT::setsockopt(client_data, 0, UDT_CC, new CCCFactory<CUDPBlast>, sizeof(CCCFactory<CUDPBlast>));
         cout << "Setting Congestion Control Method CUDPBlast" << endl;
 
+    }else if(mode ==1)
+    {
+        cout << "Using default Congestion Control Method UDT" << endl;
     }
     //UDT::setsockopt(client_data, 0, UDT_MSS, new int(mss), sizeof(int));
     //UDT::setsockopt(client_data, 0, UDT_SNDBUF, new int(10000000), sizeof(int));
@@ -265,8 +269,8 @@ int main(int argc, char* argv[])
         return 0;
     }*/
   
-    cout << "IP "<< argv[1] << " " << port_data_socket.c_str() << endl;
-    fflush(stdout);
+    //cout << "IP "<< argv[1] << " " << port_data_socket.c_str() << endl;
+    //fflush(stdout);
 
     // connect to the server, implict bind
     if (UDT::ERROR == UDT::connect(client_data, local->ai_addr, local->ai_addrlen))
@@ -278,17 +282,19 @@ int main(int argc, char* argv[])
     cout << "connect to Server: " << argv[1] << ", port: " << port_data_socket.c_str() << endl;
     
     // using CC method
-    /*
-    CUDPBlast* cchandle = NULL;
-    int temp;
-    UDT::getsockopt(client_data, 0, UDT_CC, &cchandle, &temp);
-    if (NULL != cchandle)
+    if(mode == 3)
     {
-        cout << "enter set rate" << endl;
-        cchandle->setRate(500);
+        CUDPBlast* cchandle = NULL;
+        int temp;
+        UDT::getsockopt(client_data, 0, UDT_CC, &cchandle, &temp);
+        if (NULL != cchandle)
+        {
+            cout << "enter set rate" << endl;
+            //cchandle->setRate(500);
+        }
     }
-    */
     // Getting buffer info
+    /*
     sndbuf = 0;
     if (UDT::ERROR == UDT::getsockopt(client_data, 0, UDT_SNDBUF, (char *)&sndbuf, &oplen))
     {
@@ -322,7 +328,7 @@ int main(int argc, char* argv[])
         cout << "UDP Recv Buffer size : " << sndbuf << endl;
     }
     //freeaddrinfo(peer);
-    
+    */
 
     //-----------------------------------------------------------------------------------
     // Data Sending
@@ -330,6 +336,7 @@ int main(int argc, char* argv[])
     int fd;
     int ssize = 0;
     struct stat sb;
+    char buffer[15] = {0};
 
     fd = open("/home/tony/實驗code/論文code/file.txt", O_RDONLY, S_IRWXU);
     // get file info
@@ -347,20 +354,17 @@ int main(int argc, char* argv[])
     }
     int transmit_size = 0;
     transmit_size = sb.st_size;
-    while(1)
+    
+    // send file size to server
+    sprintf(buffer, "%d", transmit_size);
+    if(UDT::ERROR == (ss = UDT::send(client_data, (char *)buffer, sizeof(buffer), 0))) 
     {
-        // record start time when receive first data packet
-        if(i == 0)
-        {
-            //start time
-            if((old_time = times(&time_start)) == -1)
-            {
-                printf("time error\n");
-                exit(1);
-            }
-            pthread_create(&t1, NULL, monitor, &client_data);
-        }
-        
+        cout << "send:" << UDT::getlasterror().getErrorMessage() << endl;
+        exit(1);
+    }
+
+    while(1)
+    { 
         if(ssize < sb.st_size)
         {
             if(UDT::ERROR == (ss = UDT::send(client_data, (char *)file_addr + ssize, transmit_size, 0))) 
@@ -370,6 +374,18 @@ int main(int argc, char* argv[])
             }
             else
             {
+                // record start time when send function first called
+                if(i == 0)
+                {
+                    //start time
+                    if((old_time = times(&time_start)) == -1)
+                    {
+                        printf("time error\n");
+                        exit(1);
+                    }
+                    pthread_create(&t1, NULL, monitor, &client_data);
+                }
+                // record already sent data size
                 ssize += ss;
                 transmit_size -= ss;
             }
@@ -394,12 +410,17 @@ int main(int argc, char* argv[])
 }
 void close_connection()
 {
+    fstream fout;
     // record result
-    fstream fout("coding_test.csv", ios::out|ios::app);
+    if (mode == 1)
+        fout.open("UDT_Send_Result.csv", ios::out|ios::app);
+    else if(mode == 2)
+        fout.open("CTCP_Send_Result.csv", ios::out|ios::app);
+    else if(mode == 3)
+        fout.open("CUDPBlast_Send_Result.csv", ios::out|ios::app);
     
     ticks = sysconf(_SC_CLK_TCK);
     printf("\n[Close Connection]\n");
-    printf("Client Seq: %d\n", seq_client);
 
     execute_time = (double)(new_time - old_time)/ticks; 
     printf("Total Sending Time (sec): %2.2f\n", execute_time);
@@ -475,13 +496,20 @@ DWORD WINAPI monitor(LPVOID s)
     UDTSOCKET u = *(UDTSOCKET*)s;
     int zero_times = 0;
     UDT::TRACEINFO perf;
+    fstream fout;
 
-    fstream fout("coding_test_monitor.csv", ios::out|ios::app);
+    if(mode == 1)
+        fout.open("Sender_UDT_Monitor.csv", ios::out|ios::app);
+    else if (mode == 2)
+        fout.open("Sender_CTCP_Monitor.csv", ios::out|ios::app);
+    else if (mode == 3)
+        fout.open("Sender_CUDPBlast_Monitor.csv", ios::out|ios::app);
+    
     
     fout << endl << endl;
     fout << "Method," << method << endl;
     fout << "MSS," << mss << endl;
-    fout << "SendRate(Mb/s)," << "ReceiveRate(Mb/s)," << "RTT(ms)," << "CWnd," << "FlowWindow," << "PktSndPeriod(us)," << "RecvACK," << "RecvNAK," << "EstimatedBandwidth(Mb/s)" << endl;
+    fout << "SendRate(Mb/s)," << "ReceiveRate(Mb/s)," << "Send Loss," << "RTT(ms)," << "CWnd," << "FlowWindow," << "PktSndPeriod(us)," << "RecvACK," << "RecvNAK," << "EstimatedBandwidth(Mb/s)" << endl;
     while (true)
     {
         #ifndef WIN32
@@ -496,7 +524,7 @@ DWORD WINAPI monitor(LPVOID s)
             break;
         }
         
-        fout << perf.mbpsSendRate << "," << perf.mbpsRecvRate << "," << perf.msRTT << "," << perf.pktCongestionWindow << ","
+        fout << perf.mbpsSendRate << "," << perf.mbpsRecvRate << "," << perf.pktSndLoss << "," << perf.msRTT << "," << perf.pktCongestionWindow << ","
             << perf.pktFlowWindow << "," << perf.usPktSndPeriod << "," << perf.pktRecvACK << "," << perf.pktRecvNAK << "," << perf.mbpsBandwidth << endl;
         if(perf.mbpsSendRate == 0 && perf.pktRecvACK == 0 && perf.pktRecvNAK == 0)
         {

@@ -38,7 +38,7 @@ int main(int argc, char **argv)
     server.sin_addr.s_addr = inet_addr(argv[1]);
     server.sin_port = htons(PORT);    
     printf("Client Socket Open:\n");
-    sd = socket(AF_INET,SOCK_STREAM,0);
+    sd = socket(AF_INET,SOCK_STREAM,IPPROTO_TCP);
     
     if(sd < 0)
     {
@@ -62,7 +62,7 @@ int main(int argc, char **argv)
         memset(buffer, '1', BUFFER_SIZE);
         if(send(sd, buffer,sizeof(buffer),0) < 0)
         {
-            DIE("recv");
+            DIE("send");
         }
 
     }
