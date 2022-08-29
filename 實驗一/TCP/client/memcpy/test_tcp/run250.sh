@@ -1,10 +1,10 @@
 #!/bin/bash
 # Program:
-#	execute 500 sender at the time
+#	execute 250 receivers at the time
 PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:~/bin
 export PATH
 i=1
-while [ "$i" -le "500" ]
+while [ "$i" -le "250" ]
 do
 echo "Client" $i "generate"
 ./background_client 140.117.171.182 &

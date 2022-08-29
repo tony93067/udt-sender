@@ -17,6 +17,8 @@
 #define DIE(x) perror(x),exit(1)
 #define PORT 8888
 
+int Background_TCP_Number = 0;
+
 int main(int argc, char **argv)
 {
     static struct sockaddr_in server;
@@ -25,17 +27,19 @@ int main(int argc, char **argv)
     double ticks;
     struct stat sb;
     int sd;
+
     
     int send_size = 0;
     // used to get mmap return virtual address
     char* file_addr;
 
-    if(argc != 2)
+    if(argc != 3)
     {
         printf("Usage: %s <server_ip>\n",argv[0]);
         exit(1);
     }
     
+    Background_TCP_Number = atoi(argv[2]);
     /* Set up destination address. */
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = inet_addr(argv[1]);
@@ -67,7 +71,7 @@ int main(int argc, char **argv)
     int fd;
     int len;
     FILE *ex = NULL;
-    ex = fopen("test.csv", "a");
+    ex = fopen("TCP_sender.csv", "a");
     // open file 
     fd = open("../../../../../file.txt", O_RDONLY, S_IRWXU);
     if (fd == -1) {
@@ -95,17 +99,18 @@ int main(int argc, char **argv)
         DIE("send");
     }
     
+    //finish time
+    if((new = times(&time_end)) == -1)
+    {
+        DIE("times error\n");
+    }
     if(munmap(file_addr, sb.st_size) == -1)
     {
         printf("munmap error\n");
         exit(1);
     }
     close(fd);
-    //finish time
-    if((new = times(&time_end)) == -1)
-    {
-        DIE("times error\n");
-    }
+    
     /********************************/
     
     /*executing time*/
@@ -113,7 +118,9 @@ int main(int argc, char **argv)
     printf("Send Time: %2.2f\n",(double)(new-old)/ticks);
     printf("send Size: %d\n", send_size);
     fprintf(ex, "%s\n", "TCP");
+    fprintf(ex, "%s\t%d\n", "Background_TCP_Number", Background_TCP_Number);
     fprintf(ex, "%s\t%f\n", "Send Time", (double)(new-old)/ticks);
+    fprintf(ex, "\n");
     fclose(ex);
     //close connection
     close(sd);

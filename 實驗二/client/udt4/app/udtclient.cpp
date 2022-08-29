@@ -84,6 +84,8 @@ UDTSOCKET client_control;
 UDTSOCKET client_data;
 char recv_buf[BUFFER_SIZE];
 
+//
+int background_TCP_number = 0;
 // use to check if pkt is in-order or out-of-order when arrive receiver side
 int current_seq;
 int num_out_of_order = 0;
@@ -103,14 +105,16 @@ DWORD WINAPI monitor(LPVOID);
 
 int main(int argc, char* argv[])
 {
-    if ((5 != argc) || (0 == atoi(argv[2])) || (atoi(argv[4]) != 1 && atoi(argv[4]) != 2))
+    if ((6 != argc))
     {
-        cout << "usage: ./udtclient [server_ip] [server_port] [MSS] [mode(1:UDT, 2:CTCP, 3:CUDPBlast)]" << endl;
+        cout << "usage: ./udtclient [server_ip] [server_port] [MSS] [mode(1:UDT, 2:CTCP, 3:CUDPBlast)] [Background TCP Number]" << endl;
         return 0;
     }
 
     mss = atoi(argv[3]); // 1us * 1Ms => 1s (because usleep use u as unit)
     cout << "mss: " << mss << endl;
+
+    background_TCP_number = atoi(argv[5]);
 
     mode = atoi(argv[4]);
     memset(method, '\0', sizeof(method));
@@ -282,6 +286,7 @@ int main(int argc, char* argv[])
     cout << "connect to Server: " << argv[1] << ", port: " << port_data_socket.c_str() << endl;
     
     // using CC method
+    /*
     if(mode == 3)
     {
         CUDPBlast* cchandle = NULL;
@@ -293,6 +298,9 @@ int main(int argc, char* argv[])
             //cchandle->setRate(500);
         }
     }
+    */
+
+   
     // Getting buffer info
     /*
     sndbuf = 0;
@@ -430,6 +438,7 @@ void close_connection()
     // write info and close file
     fout << endl << endl;
     fout << "Method," << method << endl;
+    fout << "BK TCP Number," << background_TCP_number << endl;
     fout << "MSS," << mss << endl;
     fout << "發送時間," << execute_time << endl;
     fout << endl << endl;
@@ -508,6 +517,7 @@ DWORD WINAPI monitor(LPVOID s)
     
     fout << endl << endl;
     fout << "Method," << method << endl;
+    fout << "BK TCP Number," << background_TCP_number << endl;
     fout << "MSS," << mss << endl;
     fout << "SendRate(Mb/s)," << "ReceiveRate(Mb/s)," << "Send Loss," << "RTT(ms)," << "CWnd," << "FlowWindow," << "PktSndPeriod(us)," << "RecvACK," << "RecvNAK," << "EstimatedBandwidth(Mb/s)" << endl;
     while (true)
