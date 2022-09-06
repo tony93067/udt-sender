@@ -1,17 +1,13 @@
 #!/bin/bash
 # Program:
-#	execute 15 receivers at the time
+#	execute 50 receivers at the time
 PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:~/bin
 export PATH
-area=2
-while [ "$i" != "15" ]
+i=1
+while [ "$i" -le "50" ]
 do
-#echo "Client" $i
-rand=`head -1 /dev/urandom | od -N 1 | awk '{ print $2 }'`
-seconds=`expr $rand % $area`
-echo $seconds
-sleep $seconds
-./client 140.117.170.95 &
+echo "Client" $i "generate"
 i=$(($i+1))
 done
+echo "finish"
 

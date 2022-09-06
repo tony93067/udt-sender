@@ -84,8 +84,12 @@ UDTSOCKET client_control;
 UDTSOCKET client_data;
 char recv_buf[BUFFER_SIZE];
 
-//
+// background TCP Number
 int background_TCP_number = 0;
+
+// temp variable
+char* temp_MSS;
+char* temp_BK_TCP;
 // use to check if pkt is in-order or out-of-order when arrive receiver side
 int current_seq;
 int num_out_of_order = 0;
@@ -110,10 +114,11 @@ int main(int argc, char* argv[])
         cout << "usage: ./udtclient [server_ip] [server_port] [MSS] [mode(1:UDT, 2:CTCP, 3:CUDPBlast)] [Background TCP Number]" << endl;
         return 0;
     }
-
+    temp_MSS = argv[3];
     mss = atoi(argv[3]); // 1us * 1Ms => 1s (because usleep use u as unit)
     cout << "mss: " << mss << endl;
 
+    temp_BK_TCP = argv[5];
     background_TCP_number = atoi(argv[5]);
 
     mode = atoi(argv[4]);
@@ -413,19 +418,53 @@ int main(int argc, char* argv[])
     }
     // close file
     close(fd);
-    close_connection();
+    memset(buffer, '\0', sizeof(buffer));
+    if(UDT::ERROR == (ss = UDT::recv(client_data, (char *)buffer, sizeof(buffer), 0))) 
+    {
+        cout << "send:" << UDT::getlasterror().getErrorMessage() << endl;
+        exit(1);
+    }
+    if(strncmp(buffer, "END", ss) == 0)
+    {
+        close_connection();
+    }
     return 1;
 }
 void close_connection()
 {
+    char result_addr[50] = {0}; 
     fstream fout;
     // record result
     if (mode == 1)
-        fout.open("UDT_Send_Result.csv", ios::out|ios::app);
+    {
+        strcat(result_addr, "UDT_Send_Result_");
+        strcat(result_addr, "MSS");
+        strcat(result_addr, temp_MSS);
+        strcat(result_addr, "_TCP");
+        strcat(result_addr, temp_BK_TCP);
+        strcat(result_addr, ".csv");
+        fout.open(result_addr, ios::out|ios::app);
+    }
     else if(mode == 2)
-        fout.open("CTCP_Send_Result.csv", ios::out|ios::app);
+    {
+        strcat(result_addr, "CTCP_Send_Result_");
+        strcat(result_addr, "MSS");
+        strcat(result_addr, temp_MSS);
+        strcat(result_addr, "_TCP");
+        strcat(result_addr, temp_BK_TCP);
+        strcat(result_addr, ".csv");
+        fout.open(result_addr, ios::out|ios::app);
+    }
     else if(mode == 3)
-        fout.open("CUDPBlast_Send_Result.csv", ios::out|ios::app);
+    {
+        strcat(result_addr, "CUDPBlast_Send_Result_");
+        strcat(result_addr, "MSS");
+        strcat(result_addr, temp_MSS);
+        strcat(result_addr, "_TCP");
+        strcat(result_addr, temp_BK_TCP);
+        strcat(result_addr, ".csv");
+        fout.open(result_addr, ios::out|ios::app);
+    }
     
     ticks = sysconf(_SC_CLK_TCK);
     printf("\n[Close Connection]\n");
@@ -501,19 +540,42 @@ void* monitor(void* s)
 DWORD WINAPI monitor(LPVOID s)
 #endif
 {
-    
+    char result_addr[50] = {0};
     UDTSOCKET u = *(UDTSOCKET*)s;
     int zero_times = 0;
     UDT::TRACEINFO perf;
     fstream fout;
 
     if(mode == 1)
-        fout.open("Sender_UDT_Monitor.csv", ios::out|ios::app);
+    {
+        strcat(result_addr, "Sender_UDT_Monitor_");
+        strcat(result_addr, "MSS");
+        strcat(result_addr, temp_MSS);
+        strcat(result_addr, "_TCP");
+        strcat(result_addr, temp_BK_TCP);
+        strcat(result_addr, ".csv");
+        fout.open(result_addr, ios::out|ios::app);
+    }
     else if (mode == 2)
-        fout.open("Sender_CTCP_Monitor.csv", ios::out|ios::app);
+    {
+        strcat(result_addr, "Sender_CTCP_Monitor_");
+        strcat(result_addr, "MSS");
+        strcat(result_addr, temp_MSS);
+        strcat(result_addr, "_TCP");
+        strcat(result_addr, temp_BK_TCP);
+        strcat(result_addr, ".csv");
+        fout.open(result_addr, ios::out|ios::app);
+    }
     else if (mode == 3)
-        fout.open("Sender_CUDPBlast_Monitor.csv", ios::out|ios::app);
-    
+    {
+        strcat(result_addr, "Sender_CUDPBlast_Monitor_");
+        strcat(result_addr, "MSS");
+        strcat(result_addr, temp_MSS);
+        strcat(result_addr, "_TCP");
+        strcat(result_addr, temp_BK_TCP);
+        strcat(result_addr, ".csv");
+        fout.open(result_addr, ios::out|ios::app);
+    }
     
     fout << endl << endl;
     fout << "Method," << method << endl;

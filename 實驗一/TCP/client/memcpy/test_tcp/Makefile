@@ -1,4 +1,4 @@
-all: client background_client
+all: client background_client background_client_uplink
 
 % : %.o
 
