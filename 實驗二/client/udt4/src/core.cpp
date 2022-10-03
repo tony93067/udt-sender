@@ -54,6 +54,7 @@ written by
 #endif
 #include <cmath>
 #include <sstream>
+#include <iostream>
 #include "queue.h"
 #include "core.h"
 
@@ -78,6 +79,7 @@ const int CUDT::m_iVersion = 4;
 const int CUDT::m_iSYNInterval = 10000;
 const int CUDT::m_iSelfClockInterval = 64;
 
+int first_timeout = 1;
 
 CUDT::CUDT()
 {
@@ -2568,10 +2570,16 @@ void CUDT::checkTimers()
    //   CTimer::rdtsc(currtime);
    //   m_ullNextNAKTime = currtime + m_ullNAKInt;
    //}
-
    uint64_t next_exp_time;
    if (m_pCC->m_bUserDefinedRTO)
+   {
+      if(first_timeout == 0)
+      {
+         double timeout_number = pow(2.0, (double)(m_iEXPCount - 1));
+         m_pCC->m_iRTO = timeout_number * (m_iRTT + 4 * m_iRTTVar);
+      }
       next_exp_time = m_ullLastRspTime + m_pCC->m_iRTO * m_ullCPUFrequency;
+   }
    else
    {
       uint64_t exp_int = (m_iEXPCount * (m_iRTT + 4 * m_iRTTVar) + m_iSYNInterval) * m_ullCPUFrequency;
@@ -2636,6 +2644,7 @@ void CUDT::checkTimers()
       }
 
       ++ m_iEXPCount;
+      first_timeout = 0;
       // Reset last response time since we just sent a heart-beat.
       m_ullLastRspTime = currtime;
    }

@@ -1,8 +1,59 @@
+,
+,
+,
+,
+,
+,
+,
+,
+,
+,
+,
+,
+,
+,
+,
+,
+,
+,
+,
+,
+,
+,
+,
+,
+,
+,
+,
+,
+,
+,
+,
+,
+TCP,
+Background_TCP_Number,0
+Send Time,116.33
+,
+TCP,
+Background_TCP_Number,0
+Send Time,407.91
+,
+TCP,
+Background_TCP_Number,3
+Send Time,441.05
+,
+TCP,
+Background_TCP_Number,5
+Send Time,674.05
+,
+TCP,
+Background_TCP_Number,8
+Send Time,843.6
+,
+TCP,
+Background_TCP_Number,10
+Send Time,1088.39
 TCP
-Background_TCP_Number	5000
-Send Time	207.800000
-
-TCP
-Background_TCP_Number	5000
-Send Time	226.060000
+Background_TCP_Number	0
+Send Time	732.330000
 

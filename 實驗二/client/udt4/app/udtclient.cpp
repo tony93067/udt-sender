@@ -42,6 +42,9 @@ using namespace std;
 #define CONTROL_DEFAULT_PORT "9000"
 #define DATA_DEFAULT_PORT "8999"
 
+// temporary store system time
+
+char* sys_time;
 // compute execution time
 clock_t old_time, new_time;
 // compute file writing time
@@ -73,7 +76,7 @@ void* file_addr;
 int num_timeo = 0;
 int continuous_timeo = 0;
 
-// congestion control mode : 1 : UDT, 2 : CTCP, 3 CUDPBlast
+// congestion control mode : 1 : UDT, 2 : CTCP,  CBicTCP
 int mode;
 // Maximu Segment Size
 int mss = 0;
@@ -94,6 +97,8 @@ char* temp_BK_TCP;
 int current_seq;
 int num_out_of_order = 0;
 
+int monitor_time = 0;
+
 //thread variable
 pthread_t t1;
 
@@ -109,9 +114,12 @@ DWORD WINAPI monitor(LPVOID);
 
 int main(int argc, char* argv[])
 {
+    time_t now = time(0);
+    sys_time = ctime(&now);
+    cout << sys_time << endl;
     if ((6 != argc))
     {
-        cout << "usage: ./udtclient [server_ip] [server_port] [MSS] [mode(1:UDT, 2:CTCP, 3:CUDPBlast)] [Background TCP Number]" << endl;
+        cout << "usage: ./udtclient [server_ip] [server_port] [MSS] [mode(1:UDT, 2:CTCP, 3:CBicTCP)] [Background TCP Number]" << endl;
         return 0;
     }
     temp_MSS = argv[3];
@@ -128,7 +136,7 @@ int main(int argc, char* argv[])
     else if(mode == 2)
         strcpy(method, "CTCP");
     else
-        strcpy(method, "CUDPBlast");
+        strcpy(method, "CBiCTCP");
 
     // use this function to initialize the UDT library
     UDT::startup();
@@ -181,6 +189,7 @@ int main(int argc, char* argv[])
     strcpy(control_data,START_TRANS);
     
     // send control packet(SOCK_STREAM)
+    /*
     if(UDT::ERROR == (ss = UDT::send(client_control, control_data, sizeof(control_data), 0)))
     {
         cout << "send:" << UDT::getlasterror().getErrorMessage() << endl;
@@ -201,9 +210,9 @@ int main(int argc, char* argv[])
         //cout << "rs(seq_client_recv): " << rs << endl;
         cout << "seq_client: " << seq_client << endl;
     }
-    
+    */
     // receive port_data_socket
-    if (UDT::ERROR == (rs = UDT::recv(client_control, (char *)port_data_socket.c_str(), sizeof(port_data_socket.c_str()), 0)))
+    /*if (UDT::ERROR == (rs = UDT::recv(client_control, (char *)port_data_socket.c_str(), sizeof(port_data_socket.c_str()), 0)))
     {
         cout << "recv:" << UDT::getlasterror().getErrorMessage() << endl;
         exit(1);
@@ -215,7 +224,7 @@ int main(int argc, char* argv[])
         cout << "port_data_socket: " << port_data_socket.c_str() << endl;
         service_data = port_data_socket;
         
-    }
+    }*/
 
     /* create data tranfer socket(using reliable stream mode) */
     // reset hints
@@ -224,7 +233,7 @@ int main(int argc, char* argv[])
     hints.ai_flags = AI_PASSIVE;
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
-    if (0 != getaddrinfo(argv[1], port_data_socket.c_str(), &hints, &local))
+    if (0 != getaddrinfo(argv[1], "5100", &hints, &local))
     {
         cout << "incorrect network address.\n" << endl;
         return 0;
@@ -242,8 +251,8 @@ int main(int argc, char* argv[])
 
     }else if(mode == 3)
     {
-        UDT::setsockopt(client_data, 0, UDT_CC, new CCCFactory<CUDPBlast>, sizeof(CCCFactory<CUDPBlast>));
-        cout << "Setting Congestion Control Method CUDPBlast" << endl;
+        UDT::setsockopt(client_data, 0, UDT_CC, new CCCFactory<CBiCTCP>, sizeof(CCCFactory<CBiCTCP>));
+        cout << "Setting Congestion Control Method CBiCTCP" << endl;
 
     }else if(mode ==1)
     {
@@ -404,6 +413,8 @@ int main(int argc, char* argv[])
             }
         }
         total_send_size = ssize;
+        if(monitor_time >= 500)
+            break;
         if(ssize == sb.st_size)
             break;
         
@@ -421,12 +432,17 @@ int main(int argc, char* argv[])
     memset(buffer, '\0', sizeof(buffer));
     if(UDT::ERROR == (ss = UDT::recv(client_data, (char *)buffer, sizeof(buffer), 0))) 
     {
-        cout << "send:" << UDT::getlasterror().getErrorMessage() << endl;
+        cout << "recv:" << UDT::getlasterror().getErrorMessage() << endl;
         exit(1);
     }
     if(strncmp(buffer, "END", ss) == 0)
     {
-        close_connection();
+        if(UDT::ERROR == (ss = UDT::send(client_data, (char *)buffer, sizeof(buffer), 0)))
+        {
+            cout << "send:" << UDT::getlasterror().getErrorMessage() << endl;
+            exit(1);
+        }
+        close_connection();     
     }
     return 1;
 }
@@ -457,7 +473,7 @@ void close_connection()
     }
     else if(mode == 3)
     {
-        strcat(result_addr, "CUDPBlast_Send_Result_");
+        strcat(result_addr, "CBiCTCP_Send_Result_");
         strcat(result_addr, "MSS");
         strcat(result_addr, temp_MSS);
         strcat(result_addr, "_TCP");
@@ -478,6 +494,7 @@ void close_connection()
     fout << endl << endl;
     fout << "Method," << method << endl;
     fout << "BK TCP Number," << background_TCP_number << endl;
+    fout << "程式執行時間," << sys_time << endl;
     fout << "MSS," << mss << endl;
     fout << "發送時間," << execute_time << endl;
     fout << endl << endl;
@@ -568,7 +585,7 @@ DWORD WINAPI monitor(LPVOID s)
     }
     else if (mode == 3)
     {
-        strcat(result_addr, "Sender_CUDPBlast_Monitor_");
+        strcat(result_addr, "Sender_CBiCTCP_Monitor_");
         strcat(result_addr, "MSS");
         strcat(result_addr, temp_MSS);
         strcat(result_addr, "_TCP");
@@ -577,11 +594,12 @@ DWORD WINAPI monitor(LPVOID s)
         fout.open(result_addr, ios::out|ios::app);
     }
     
-    fout << endl << endl;
-    fout << "Method," << method << endl;
-    fout << "BK TCP Number," << background_TCP_number << endl;
-    fout << "MSS," << mss << endl;
-    fout << "SendRate(Mb/s)," << "ReceiveRate(Mb/s)," << "Send Loss," << "RTT(ms)," << "CWnd," << "FlowWindow," << "PktSndPeriod(us)," << "RecvACK," << "RecvNAK," << "EstimatedBandwidth(Mb/s)" << endl;
+    //fout << endl << endl;
+    //fout << "Method," << method << endl;
+    //fout << "BK TCP Number," << background_TCP_number << endl;
+    //fout << "程式執行時間," << sys_time << endl;
+    //fout << "MSS," << mss << endl;
+    fout << "SendPacket," <<"SendRate(Mb/s)," << "FlightSize," << "ReceiveRate(Mb/s)," << "Send Loss," << "Recv Loss," << "RTT(ms)," << "CWnd," << "FlowWindow," << "Retrans," << "PktSndPeriod(us)," << "RecvACK," << "RecvNAK," << "EstimatedBandwidth(Mb/s)," << "Retrans_Total," << "NAK_TotalRecv," << "Total Send Loss," << "Total Recv Loss" << endl;
     while (true)
     {
         #ifndef WIN32
@@ -595,9 +613,11 @@ DWORD WINAPI monitor(LPVOID s)
             cout << "perfmon: " << UDT::getlasterror().getErrorMessage() << endl;
             break;
         }
-        
-        fout << perf.mbpsSendRate << "," << perf.mbpsRecvRate << "," << perf.pktSndLoss << "," << perf.msRTT << "," << perf.pktCongestionWindow << ","
-            << perf.pktFlowWindow << "," << perf.usPktSndPeriod << "," << perf.pktRecvACK << "," << perf.pktRecvNAK << "," << perf.mbpsBandwidth << endl;
+        fout << perf.pktSent << "," << perf.mbpsSendRate << "," << perf.pktFlightSize << "," << perf.mbpsRecvRate << "," << perf.pktSndLoss << "," << perf.pktRcvLoss << ","<< perf.msRTT << "," << perf.pktCongestionWindow << ","
+            << perf.pktFlowWindow << "," << perf.pktRetrans << "," << perf.usPktSndPeriod << "," << perf.pktRecvACK << "," << perf.pktRecvNAK << "," << perf.mbpsBandwidth << "," << perf.pktRetransTotal << "," << perf.pktRecvNAKTotal << "," << perf.pktSndLossTotal << "," << perf.pktRcvLossTotal << endl;
+        monitor_time ++;
+        if(monitor_time >= 600)
+            break;
         if(perf.mbpsSendRate == 0 && perf.pktRecvACK == 0 && perf.pktRecvNAK == 0)
         {
             zero_times++;

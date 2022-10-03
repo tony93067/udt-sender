@@ -41,8 +41,11 @@ written by
 
 #include "core.h"
 #include "ccc.h"
+#include <iostream>
 #include <cmath>
 #include <cstring>
+
+using namespace std;
 
 CCC::CCC():
 m_iSYNInterval(CUDT::m_iSYNInterval),

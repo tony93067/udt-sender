@@ -15,7 +15,7 @@
 #include <sys/mman.h>
 
 #define DIE(x) perror(x),exit(1)
-#define PORT 9000
+#define PORT 12000
 
 int Background_TCP_Number = 0;
 
@@ -35,7 +35,7 @@ int main(int argc, char **argv)
 
     if(argc != 3)
     {
-        printf("Usage: %s <server_ip>\n",argv[0]);
+        printf("Usage: %s <server_ip> <Background TCP Number>\n",argv[0]);
         exit(1);
     }
     
