@@ -119,7 +119,7 @@ int main(int argc, char* argv[])
     cout << sys_time << endl;
     if ((6 != argc))
     {
-        cout << "usage: ./udtclient [server_ip] [server_port] [MSS] [mode(1:UDT, 2:CTCP, 3:CBicTCP)] [Background TCP Number]" << endl;
+        cout << "usage: ./udtclient [server_ip] [server_port] [MSS] [mode(1:UDT, 2:CTCP, 3:CBicTCP), 4:CHTCP] [Background TCP Number]" << endl;
         return 0;
     }
     temp_MSS = argv[3];
@@ -135,8 +135,10 @@ int main(int argc, char* argv[])
         strcpy(method, "UDT");
     else if(mode == 2)
         strcpy(method, "CTCP");
-    else
+    else if(mode == 3)
         strcpy(method, "CBiCTCP");
+    else
+        strcpy(method, "CHTCP");
 
     // use this function to initialize the UDT library
     UDT::startup();
@@ -257,6 +259,10 @@ int main(int argc, char* argv[])
     }else if(mode ==1)
     {
         cout << "Using default Congestion Control Method UDT" << endl;
+    }else if (mode == 4)
+    {
+        UDT::setsockopt(client_data, 0, UDT_CC, new CCCFactory<CHTCP>, sizeof(CCCFactory<CHTCP>));
+        cout << "Setting Congestion Control Method CHTCP" << endl;
     }
     //UDT::setsockopt(client_data, 0, UDT_MSS, new int(mss), sizeof(int));
     //UDT::setsockopt(client_data, 0, UDT_SNDBUF, new int(10000000), sizeof(int));
@@ -448,6 +454,7 @@ int main(int argc, char* argv[])
 }
 void close_connection()
 {
+    /*
     char result_addr[50] = {0}; 
     fstream fout;
     // record result
@@ -499,7 +506,7 @@ void close_connection()
     fout << "發送時間," << execute_time << endl;
     fout << endl << endl;
     fout.close();
-    
+    */
     // close control message exchange
     throughput_bytes = (double)total_send_size / execute_time;
     print_throughput(throughput_bytes);  
@@ -593,6 +600,17 @@ DWORD WINAPI monitor(LPVOID s)
         strcat(result_addr, ".csv");
         fout.open(result_addr, ios::out|ios::app);
     }
+    else if (mode == 4)
+    {
+        strcat(result_addr, "Sender_CHTCP_Monitor_");
+        strcat(result_addr, "MSS");
+        strcat(result_addr, temp_MSS);
+        strcat(result_addr, "_TCP");
+        strcat(result_addr, temp_BK_TCP);
+        strcat(result_addr, ".csv");
+        fout.open(result_addr, ios::out|ios::app);
+    }
+    
     
     //fout << endl << endl;
     //fout << "Method," << method << endl;
@@ -617,15 +635,6 @@ DWORD WINAPI monitor(LPVOID s)
             << perf.pktFlowWindow << "," << perf.pktRetrans << "," << perf.usPktSndPeriod << "," << perf.pktRecvACK << "," << perf.pktRecvNAK << "," << perf.mbpsBandwidth << "," << perf.pktRetransTotal << "," << perf.pktRecvNAKTotal << "," << perf.pktSndLossTotal << "," << perf.pktRcvLossTotal << endl;
         monitor_time ++;
         if(monitor_time >= 600)
-            break;
-        if(perf.mbpsSendRate == 0 && perf.pktRecvACK == 0 && perf.pktRecvNAK == 0)
-        {
-            zero_times++;
-        }else
-        {
-            zero_times = 0;
-        }
-        if(zero_times >= 5)
             break;
         /*cout << perf.mbpsSendRate << "\t\t" 
             << perf.msRTT << "\t" 

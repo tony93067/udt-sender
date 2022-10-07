@@ -114,7 +114,7 @@ protected:
 
       if (!m_bSlowStart)
       {
-         if (m_dTargetWin - m_dCWndSize < m_iSMax)
+         if ((m_dTargetWin - m_dCWndSize < m_iSMax) && (m_dTargetWin - m_dCWndSize > 0))
             m_dCWndSize += (m_dTargetWin - m_dCWndSize)/m_dCWndSize;
          else
             m_dCWndSize += m_iSMax/m_dCWndSize;
@@ -179,21 +179,146 @@ private:
 };
 
 
-class CUDPBlast: public CCC
+/******************************************************************************************
+ * 
+ * */
+class CHTCP: public CCC
 {
 public:
-   CUDPBlast()
+   void init()
    {
-      printf(" CUDPBlast\n");
-      // m_dPktSndPeriod = 1000000; 
+      m_dMaxWin = m_iDefaultMaxWin;
+      m_bSlowStart = true;
+      m_congestion_avoidance = false;
+      m_maxprobe = false;
+      m_issthresh = 83333;
+      printf("CHTCP\n");
       m_dPktSndPeriod = 0.0;
-      m_dCWndSize = 83333.0; 
-      // m_dCWndSize = 2.0;
+      m_dCWndSize = 2.0;
+
+      m_dSSTargetWin = m_dCWndSize + 1.0;
+
+
+      setACKInterval(2);
+      setRTO(1000000);
    }
 
-public:
-   void setRate(double mbps)
+   virtual void onACK(const int& ack)
    {
-      m_dPktSndPeriod = (m_iMSS * 8.0) / mbps;
+      if (ack == m_iLastACK)
+      {
+         if (3 == ++ m_iDupACKCount)
+            DupACKAction();
+         else if (m_iDupACKCount > 3)
+            m_dCWndSize += 1.0;
+         else
+            ACKAction();
+      }
+      else
+      {
+         if (m_iDupACKCount >= 3)
+            m_dCWndSize = m_issthresh;
+
+         m_iLastACK = ack;
+         m_iDupACKCount = 1;
+
+         ACKAction();
+      }
    }
+
+   virtual void onTimeout()
+   {
+      m_issthresh = getPerfInfo()->pktFlightSize / 2;
+      if (m_issthresh < 2)
+         m_issthresh = 2;
+
+      m_bSlowStart = true;
+      m_congestion_avoidance = false;
+      m_maxprobe = false;
+      m_dCWndSize = 2.0;
+   }
+
+protected:
+   virtual void ACKAction()
+   {
+      if (m_bSlowStart)
+      {
+         m_dCWndSize += 1.0;
+
+         if (m_dCWndSize >= m_issthresh)
+         {
+            m_bSlowStart = false;
+            m_congestion_avoidance = true;
+         }
+      }
+      else if(m_congestion_avoidance)
+      {
+         m_dCWndSize += 1.0/m_dCWndSize;
+         if(m_dMaxWin <= m_dCWndSize)
+         {
+            m_maxprobe = true;
+            m_congestion_avoidance = false;
+            m_dSSCWnd = 1.0;
+            m_dSSTargetWin = m_dCWndSize + 1.0;
+            m_dMaxWin = m_iDefaultMaxWin;
+         }
+      }
+      else
+      {
+         if (!m_maxprobe)
+         {
+            if(m_dSSCWnd >= m_iSMax)
+               m_dCWndSize += m_iSMax/m_dCWndSize;
+         }
+         else
+         {
+            m_dCWndSize += m_dSSCWnd/m_dCWndSize;
+            if(m_dCWndSize >= m_dSSTargetWin)
+            {
+               m_dSSCWnd *= 2;
+               m_dSSTargetWin = m_dCWndSize + m_dSSCWnd;
+            }
+            if(m_dSSCWnd >= m_iSMax)
+               m_maxprobe = false;
+         }
+      }
+   }
+
+   virtual void DupACKAction()
+   {
+   
+      m_congestion_avoidance = true;
+      m_bSlowStart = false;
+      m_maxprobe = false;
+      m_dPreMax = m_dMaxWin;
+      m_dMaxWin = m_dCWndSize;
+      if (m_dPreMax > m_dMaxWin)
+         m_issthresh = getPerfInfo()->pktFlightSize / 2;
+      else
+         m_issthresh = getPerfInfo()->pktFlightSize * 0.75;
+      if (m_issthresh < 2)
+         m_issthresh = 2;
+
+      m_dCWndSize = m_issthresh + 3;
+   }
+
+protected:
+   int m_issthresh;
+   bool m_bSlowStart;
+   bool m_congestion_avoidance;
+   bool m_maxprobe;
+   
+   int m_iDupACKCount;
+   int m_iLastACK;
+
+   double m_dMaxWin;
+   double m_dPreMax;
+   double m_dSSCWnd;
+   double m_dSSTargetWin;
+
+
+   static const int m_iSMax = 32;
+   static const int m_iDefaultMaxWin = 1 << 29;
+   
+
 };

@@ -8,7 +8,7 @@ UDT_PATH=/home/tony/實驗code/論文code/實驗二/client/udt4/app
 MSS=("1500" "1250" "1000" "750" "500" "250" "100")
 BK=10
 export PATH
-for (( c=2; c<=2; c++ ))
+for (( c=1; c<=4; c++ ))
 do
 	for str in ${MSS[@]}
 	do
