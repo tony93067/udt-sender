@@ -137,8 +137,7 @@ int main(int argc, char* argv[])
         strcpy(method, "CTCP");
     else if(mode == 3)
         strcpy(method, "CBiCTCP");
-    else
-        strcpy(method, "CHTCP");
+  
 
     // use this function to initialize the UDT library
     UDT::startup();
@@ -259,10 +258,6 @@ int main(int argc, char* argv[])
     }else if(mode ==1)
     {
         cout << "Using default Congestion Control Method UDT" << endl;
-    }else if (mode == 4)
-    {
-        UDT::setsockopt(client_data, 0, UDT_CC, new CCCFactory<CHTCP>, sizeof(CCCFactory<CHTCP>));
-        cout << "Setting Congestion Control Method CHTCP" << endl;
     }
     //UDT::setsockopt(client_data, 0, UDT_MSS, new int(mss), sizeof(int));
     //UDT::setsockopt(client_data, 0, UDT_SNDBUF, new int(10000000), sizeof(int));
