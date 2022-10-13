@@ -419,7 +419,7 @@ int main(int argc, char* argv[])
             }
         }
         total_send_size = ssize;
-        if(monitor_time >= 500)
+        if(monitor_time >= 600)
             break;
         if(ssize == sb.st_size)
             break;
@@ -435,21 +435,21 @@ int main(int argc, char* argv[])
     }
     // close file
     close(fd);
-    memset(buffer, '\0', sizeof(buffer));
+    /*memset(buffer, '\0', sizeof(buffer));
     if(UDT::ERROR == (ss = UDT::recv(client_data, (char *)buffer, sizeof(buffer), 0))) 
     {
         cout << "recv:" << UDT::getlasterror().getErrorMessage() << endl;
         exit(1);
-    }
-    if(strncmp(buffer, "END", ss) == 0)
-    {
-        if(UDT::ERROR == (ss = UDT::send(client_data, (char *)buffer, sizeof(buffer), 0)))
-        {
-            cout << "send:" << UDT::getlasterror().getErrorMessage() << endl;
-            exit(1);
-        }
-        close_connection();     
-    }
+    }*/
+    // if(strncmp(buffer, "END", ss) == 0)
+    // {
+    //     if(UDT::ERROR == (ss = UDT::send(client_data, (char *)buffer, sizeof(buffer), 0)))
+    //     {
+    //         cout << "send:" << UDT::getlasterror().getErrorMessage() << endl;
+    //         exit(1);
+    //     }
+    close_connection();     
+    // }
     return 1;
 }
 void close_connection()
@@ -508,8 +508,8 @@ void close_connection()
     fout.close();
     */
     // close control message exchange
-    throughput_bytes = (double)total_send_size / execute_time;
-    print_throughput(throughput_bytes);  
+    //throughput_bytes = (double)total_send_size / execute_time;
+    //print_throughput(throughput_bytes);  
     /*cout << "send END_TRANS" << endl;
     char control_data3[sizeof(END_TRANS)];
     int ss_control_data3 = 0;
