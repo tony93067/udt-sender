@@ -105,6 +105,21 @@ public:
       m_dSSCWnd = 1.0;
       m_dSSTargetWin = m_dCWndSize + 1.0;
    }
+   virtual void onTimeout()
+   {
+      m_issthresh = getPerfInfo()->pktFlightSize / 2;
+      if (m_issthresh < 2)
+         m_issthresh = 2;
+      
+      m_dCWndSize = 2.0;
+      
+      // reset paramenter
+      m_bSlowStart = true;
+      m_dMaxWin = m_iDefaultMaxWin;
+      m_dMinWin = m_dCWndSize;
+      m_dTargetWin = (m_dMaxWin + m_dMinWin) / 2;
+      max_probe = false;
+   }
 
 protected:
    virtual void ACKAction()
@@ -112,6 +127,7 @@ protected:
       if (m_dCWndSize < m_iLowWindow)
       {
          m_dCWndSize += 1/m_dCWndSize;
+         return;
       }
 
       if (!max_probe)
@@ -159,12 +175,13 @@ protected:
          m_dMaxWin = m_dCWndSize;
          m_dCWndSize *= 0.875;
          m_dMinWin = m_dCWndSize;
+         
+         max_probe = false;
 
-         if (m_dPreMax > m_dMaxWin)
-         {
-            m_dMaxWin = (m_dMaxWin + m_dMinWin) / 2;
-            m_dTargetWin = (m_dMaxWin + m_dMinWin) / 2;
-         }
+         if (m_dPreMax > m_dMaxWin){
+         	m_dMaxWin = (m_dMaxWin + m_dMinWin) / 2;
+         	}
+         m_dTargetWin = (m_dMaxWin + m_dMinWin) / 2;
       }
    }
 
