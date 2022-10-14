@@ -105,31 +105,72 @@ public:
       m_dSSCWnd = 1.0;
       m_dSSTargetWin = m_dCWndSize + 1.0;
    }
+   
    virtual void onTimeout()
    {
       m_issthresh = getPerfInfo()->pktFlightSize / 2;
+
       if (m_issthresh < 2)
          m_issthresh = 2;
       
       m_dCWndSize = 2.0;
       
       // reset paramenter
-      m_bSlowStart = true;
       m_dMaxWin = m_iDefaultMaxWin;
       m_dMinWin = m_dCWndSize;
-      m_dTargetWin = (m_dMaxWin + m_dMinWin) / 2;
+
       max_probe = false;
+      m_bSlowStart = true;
    }
 
 protected:
    virtual void ACKAction()
    {
-      if (m_dCWndSize < m_iLowWindow)
+      if (m_dCWndSize < m_iLowWindow) // cwnd < low window 則 TCP reno
       {
-         m_dCWndSize += 1/m_dCWndSize;
+         if (m_bSlowStart)
+         {
+            m_dCWndSize += 1.0;
+
+            if (m_dCWndSize >= m_issthresh)
+               m_bSlowStart = false;
+         }
+         else
+            m_dCWndSize += 1/m_dCWndSize;
+
          return;
       }
+      m_dMinWin = m_dCWndSize;
+      if(m_dCWndSize < m_dMaxWin && !max_probe) // additive increase or binary increase
+      {
+         bic_inc = (m_dMaxWin - m_dMinWin)/2;
+         
+         if(bic_inc >= m_iSMax)      // 大於 Smax -> + Smax
+            bic_inc = m_iSMax;
+         else if (bic_inc <= m_iSMin)// 小於 Smin -> + Smin
+            bic_inc = m_iSMin;
 
+         m_dCWndSize += bic_inc/m_dCWndSize;
+      }
+      else if(m_dCWndSize >= m_dMaxWin && !max_probe)         // 如果 cwnd >= Winmax 則開始 max probe
+      {
+         max_probe = true;
+         m_dSSCWnd = 1.0;
+         m_dSSTargetWin = m_dCWndSize + 1.0;
+         m_dMaxWin = m_iDefaultMaxWin;
+      }
+      if(max_probe)
+      {
+         m_dCWndSize += m_dSSCWnd/m_dCWndSize;
+         if(m_dCWndSize >= m_dSSTargetWin)
+         {
+            m_dSSCWnd *= 2;
+            m_dSSTargetWin = m_dCWndSize + m_dSSCWnd;
+         }
+         if(m_dSSCWnd >= m_iSMax)
+            max_probe = false;
+      }
+      /*
       if (!max_probe)
       {
       	 if ((m_dTargetWin - m_dCWndSize < m_iSMin) && (m_dTargetWin - m_dCWndSize > 0))
@@ -154,7 +195,7 @@ protected:
       }
       else
       {
-         m_dCWndSize += m_dSSCWnd/m_dCWndSize;
+         
          if(m_dCWndSize >= m_dSSTargetWin)
          {
             m_dSSCWnd *= 2;
@@ -162,26 +203,42 @@ protected:
          }
          if(m_dSSCWnd >= m_iSMax)
             max_probe = false;
-      }        
+      } */
    }
 
    virtual void DupACKAction()
    {
-      if (m_dCWndSize <= m_iLowWindow)
-         m_dCWndSize *= 0.5;
+      if (m_dCWndSize < m_iLowWindow) // if in TCP reno reset all parameter
+      {
+         m_issthresh = getPerfInfo()->pktFlightSize / 2;
+
+         if (m_issthresh < 2)
+            m_issthresh = 2;
+
+         m_dCWndSize = m_issthresh + 3;
+
+         // reset parameter
+         max_probe = false;
+         m_bSlowStart = false;         // 3 dup ACK 進入 congestion avoidance
+         //m_dMaxWin = m_iLowWindow;
+         m_dMinWin = m_dCWndSize;
+      }
       else
       {
          m_dPreMax = m_dMaxWin;
          m_dMaxWin = m_dCWndSize;
-         m_dCWndSize *= 0.875;
+         m_dCWndSize *= 0.8;
          m_dMinWin = m_dCWndSize;
+
+         m_issthresh = m_dCWndSize;
          
          max_probe = false;
-
-         if (m_dPreMax > m_dMaxWin){
+         m_bSlowStart = false;         // 3 dup ACK 進入 congestion avoidance
+         
+         if (m_dPreMax > m_dMaxWin)
+         {
          	m_dMaxWin = (m_dMaxWin + m_dMinWin) / 2;
-         	}
-         m_dTargetWin = (m_dMaxWin + m_dMinWin) / 2;
+         }
       }
    }
 
@@ -191,12 +248,13 @@ private:
    static const int m_iSMin = 1;
    static const int m_iDefaultMaxWin = 1 << 29;
    
-   bool max_probe;
-   double m_dMaxWin;
-   double m_dMinWin;
+   bool max_probe;                        // 超時或是3 dup ACK 要重設該變數
+   double bic_inc;
+   double m_dMaxWin;                      // 超時或是3 dup ACK 要重設該變數
+   double m_dMinWin;                      // 超時或是3 dup ACK 要重設該變數
    double m_dPreMax;
    double m_dTargetWin;
    double m_dSSCWnd;
-   double m_dSSTargetWin;
+   double m_dSSTargetWin;                
 };
 

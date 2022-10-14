@@ -561,7 +561,6 @@ DWORD WINAPI monitor(LPVOID s)
 {
     char result_addr[50] = {0};
     UDTSOCKET u = *(UDTSOCKET*)s;
-    int zero_times = 0;
     UDT::TRACEINFO perf;
     fstream fout;
 
