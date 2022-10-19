@@ -162,6 +162,8 @@ struct CPerfMon
    int64_t msTimeStamp;                 // time since the UDT entity is started, in milliseconds
    int64_t pktSentTotal;                // total number of sent data packets, including retransmissions
    int64_t pktRecvTotal;                // total number of received packets
+   int timeout = 0;
+   int fast = 0;
    int pktSndLossTotal;                 // total number of lost packets (sender side)
    int pktRcvLossTotal;                 // total number of lost packets (receiver side)
    int pktRetransTotal;                 // total number of retransmitted packets
@@ -170,7 +172,7 @@ struct CPerfMon
    int pktSentNAKTotal;                 // total number of sent NAK packets
    int pktRecvNAKTotal;                 // total number of received NAK packets
    int64_t usSndDurationTotal;		// total time duration when UDT is sending data (idle time exclusive)
-
+  
    // local measurements
    int64_t pktSent;                     // number of sent data packets, including retransmissions
    int64_t pktRecv;                     // number of received packets

@@ -414,13 +414,14 @@ int main(int argc, char* argv[])
             }
         }
         total_send_size = ssize;
-        if(monitor_time >= 600)
+        if(monitor_time >= 500)
             break;
         if(ssize == sb.st_size)
             break;
         
         i++;
     }
+    munmap(file_addr, sb.st_size);
     cout << "end sending" << endl;
     //finish time
     if((new_time = times(&time_end)) == -1)
@@ -563,6 +564,7 @@ DWORD WINAPI monitor(LPVOID s)
     UDTSOCKET u = *(UDTSOCKET*)s;
     UDT::TRACEINFO perf;
     fstream fout;
+    int zero_times = 0;
 
     if(mode == 1)
     {
@@ -611,7 +613,7 @@ DWORD WINAPI monitor(LPVOID s)
     //fout << "BK TCP Number," << background_TCP_number << endl;
     //fout << "程式執行時間," << sys_time << endl;
     //fout << "MSS," << mss << endl;
-    fout << "SendPacket," <<"SendRate(Mb/s)," << "FlightSize," << "ReceiveRate(Mb/s)," << "Send Loss," << "Recv Loss," << "RTT(ms)," << "CWnd," << "FlowWindow," << "Retrans," << "PktSndPeriod(us)," << "RecvACK," << "RecvNAK," << "EstimatedBandwidth(Mb/s)," << "Retrans_Total," << "NAK_TotalRecv," << "Total Send Loss," << "Total Recv Loss" << endl;
+    fout << "SendPacket," <<"SendRate(Mb/s)," << "FlightSize," << "ReceiveRate(Mb/s)," << "Send Loss," << "Recv Loss," << "RTT(ms)," << "CWnd," << "FlowWindow," << "Retrans," << "PktSndPeriod(us)," << "RecvACK," << "RecvNAK," << "EstimatedBandwidth(Mb/s)," << "Retrans_Total," << "NAK_TotalRecv," << "Total Send Loss," << "Total Recv Loss," << "Timeout,"<< "usSndDuration"<< endl;
     while (true)
     {
         #ifndef WIN32
@@ -619,16 +621,25 @@ DWORD WINAPI monitor(LPVOID s)
         #else
             Sleep(1000);
         #endif
-            
         if (UDT::ERROR == UDT::perfmon(u, &perf))
         {
             cout << "perfmon: " << UDT::getlasterror().getErrorMessage() << endl;
             break;
         }
         fout << perf.pktSent << "," << perf.mbpsSendRate << "," << perf.pktFlightSize << "," << perf.mbpsRecvRate << "," << perf.pktSndLoss << "," << perf.pktRcvLoss << ","<< perf.msRTT << "," << perf.pktCongestionWindow << ","
-            << perf.pktFlowWindow << "," << perf.pktRetrans << "," << perf.usPktSndPeriod << "," << perf.pktRecvACK << "," << perf.pktRecvNAK << "," << perf.mbpsBandwidth << "," << perf.pktRetransTotal << "," << perf.pktRecvNAKTotal << "," << perf.pktSndLossTotal << "," << perf.pktRcvLossTotal << endl;
+            << perf.pktFlowWindow << "," << perf.pktRetrans << "," << perf.usPktSndPeriod << "," << perf.pktRecvACK << "," << perf.pktRecvNAK << "," << perf.mbpsBandwidth << "," << perf.pktRetransTotal << "," << perf.pktRecvNAKTotal << "," << perf.pktSndLossTotal << "," << perf.pktRcvLossTotal << "," << perf.timeout << "," << perf.usSndDuration << endl;
         monitor_time ++;
-        if(monitor_time >= 600)
+        if(monitor_time >= 500)
+            break;
+
+        if(perf.mbpsSendRate == 0 && perf.pktRecvACK == 0 && perf.pktRecvNAK == 0)
+        {
+            zero_times++;
+        }else
+        {
+            zero_times = 0;
+        }
+        if(zero_times >= 5)
             break;
         /*cout << perf.mbpsSendRate << "\t\t" 
             << perf.msRTT << "\t" 
