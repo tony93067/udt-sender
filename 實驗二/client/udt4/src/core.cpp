@@ -494,6 +494,7 @@ void CUDT::open()
    m_iPayloadSize = m_iPktSize - CPacket::m_iPktHdrSize;
 
    m_iEXPCount = 1;
+   last_EXPCount = 1;
    m_iBandwidth = 1;
    m_iDeliveryRate = 16;
    m_iAckSeqNo = 0;
@@ -1605,6 +1606,7 @@ void CUDT::sample(CPerfMon* perf, bool clear)
    perf->pktRecvNAK = m_iRecvNAK;
    perf->usSndDuration = m_llSndDuration;
    perf->timeout = m_timeout;
+   perf->exp_count = m_iEXPCount;
   
    perf->pktSentTotal = m_llSentTotal;
    perf->pktRecvTotal = m_llRecvTotal;
@@ -2578,23 +2580,19 @@ void CUDT::checkTimers()
    uint64_t next_exp_time;
    if (m_pCC->m_bUserDefinedRTO)
    {
-      uint64_t exp_int;
-      u_int64_t m_ullMinRTOInt = 1000000 * m_ullCPUFrequency;
+      uint64_t m_ullMinRTOInt = 1000000 * m_ullCPUFrequency;
       if(first_timeout == 0)
       {
-         if(m_iEXPCount == 1) // 第一次啟動 timeout 計時器
-         {
-            exp_int = (m_iRTT + 4 * m_iRTTVar) * m_ullCPUFrequency;
-         }
-         else if(m_iEXPCount > 1)// 發生多次 timeout
-         {
-            exp_int = exp_int * 2;
-         }
-         if (exp_int < m_ullMinRTOInt){ // RTO 小於 1秒
-            exp_int = m_ullMinRTOInt;
-         }
-         
+         double timeout_number = pow(2.0, (double)(m_iEXPCount - 1));
+         uint64_t exp_int = (timeout_number * (m_iRTT + 4 * m_iRTTVar)) * m_ullCPUFrequency;
+
+         if(exp_int < m_ullMinRTOInt * timeout_number)
+            exp_int = m_ullMinRTOInt * timeout_number;
          next_exp_time = m_ullLastRspTime + exp_int;
+      }
+      else
+      {
+         next_exp_time = m_ullLastRspTime + m_pCC->m_iRTO * m_ullCPUFrequency;
       }
    }
    else

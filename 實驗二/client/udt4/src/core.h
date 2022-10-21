@@ -315,6 +315,7 @@ private: // Status
    bool m_bOpened;                              // If the UDT entity has been opened
    int m_iBrokenCounter;			// a counter (number of GC checks) to let the GC tag this socket as disconnected
 
+   int last_EXPCount;
    int m_iEXPCount;                             // Expiration counter
    int m_iBandwidth;                            // Estimated bandwidth, number of packets per second
    int m_iRTT;                                  // RTT, in microseconds

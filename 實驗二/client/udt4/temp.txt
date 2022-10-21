@@ -1,0 +1,30 @@
+uint64_t m_ullMinRTOInt = 1000000 * m_ullCPUFrequency;
+      exp_int = m_ullMinRTOInt;
+      if(first_timeout == 0)
+      {
+         if (m_iEXPCount == 1)
+         {
+            last_EXPCount = 1;
+            exp_int = (m_iRTT + 4 * m_iRTTVar) * m_ullCPUFrequency;
+         }
+
+         if (exp_int < m_ullMinRTOInt){ // RTO 小於 1秒
+            exp_int = m_ullMinRTOInt;
+         }
+
+         if(m_iEXPCount > last_EXPCount)// 發生多次 timeout
+         {
+            exp_int = exp_int * 2;
+         }
+         double timeout_number = pow(2.0, (double)(m_iEXPCount - 1));
+         if(m_iEXPCount > last_EXPCount)
+            last_EXPCount = m_iEXPCount;
+         
+         if(exp_int < m_ullMinRTOInt * timeout_number)
+            exp_int = m_ullMinRTOInt * timeout_number;
+         next_exp_time = m_ullLastRspTime + exp_int;
+      }
+      else
+      {
+         next_exp_time = m_ullLastRspTime + m_pCC->m_iRTO * m_ullCPUFrequency;
+      }

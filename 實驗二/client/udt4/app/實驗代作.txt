@@ -1,1 +1,11 @@
 tcp bk 0 3 5 8 10 MSS all 重作
+
+if(first_timeout == 0)
+      {
+         double timeout_number = pow(2.0, (double)(m_iEXPCount - 1));
+         next_exp_time = m_ullLastRspTime + (timeout_number * m_pCC->m_iRTO * m_ullCPUFrequency);         
+      }
+      else
+      {
+         next_exp_time = m_ullLastRspTime + m_pCC->m_iRTO * m_ullCPUFrequency;
+      }

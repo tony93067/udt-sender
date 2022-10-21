@@ -163,7 +163,6 @@ struct CPerfMon
    int64_t pktSentTotal;                // total number of sent data packets, including retransmissions
    int64_t pktRecvTotal;                // total number of received packets
    int timeout = 0;
-   int fast = 0;
    int pktSndLossTotal;                 // total number of lost packets (sender side)
    int pktRcvLossTotal;                 // total number of lost packets (receiver side)
    int pktRetransTotal;                 // total number of retransmitted packets
@@ -186,6 +185,7 @@ struct CPerfMon
    double mbpsSendRate;                 // sending rate in Mb/s
    double mbpsRecvRate;                 // receiving rate in Mb/s
    int64_t usSndDuration;		// busy sending time (i.e., idle time exclusive)
+   int exp_count;
 
    // instant measurements
    double usPktSndPeriod;               // packet sending period, in microseconds
