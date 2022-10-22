@@ -112,8 +112,8 @@ public:
    {
       m_issthresh = getPerfInfo()->pktFlightSize / 2;
 
-      //m_dMaxWin = getPerfInfo()->pktFlightSize;
-      m_dMaxWin = m_iDefaultMaxWin;
+      m_dMaxWin = getPerfInfo()->pktFlightSize;
+      //m_dMaxWin = m_iDefaultMaxWin;
       if (m_issthresh < 2)
          m_issthresh = 2;
       
