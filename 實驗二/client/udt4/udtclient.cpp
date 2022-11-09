@@ -137,8 +137,7 @@ int main(int argc, char* argv[])
         strcpy(method, "CTCP");
     else if(mode == 3)
         strcpy(method, "CBiCTCP");
-    else
-        strcpy(method, "CHTCP");
+  
 
     // use this function to initialize the UDT library
     UDT::startup();
@@ -259,10 +258,6 @@ int main(int argc, char* argv[])
     }else if(mode ==1)
     {
         cout << "Using default Congestion Control Method UDT" << endl;
-    }else if (mode == 4)
-    {
-        UDT::setsockopt(client_data, 0, UDT_CC, new CCCFactory<CHTCP>, sizeof(CCCFactory<CHTCP>));
-        cout << "Setting Congestion Control Method CHTCP" << endl;
     }
     //UDT::setsockopt(client_data, 0, UDT_MSS, new int(mss), sizeof(int));
     //UDT::setsockopt(client_data, 0, UDT_SNDBUF, new int(10000000), sizeof(int));
@@ -361,14 +356,14 @@ int main(int argc, char* argv[])
     //-----------------------------------------------------------------------------------
     // Data Sending
     int i = 0;
-    //int fd;
-    //int ssize = 0;
-    //struct stat sb;
+    int fd;
+    int ssize = 0;
+    struct stat sb;
     char buffer[15] = {0};
 
-    //fd = open("/home/tony/實驗code/論文code/file.txt", O_RDONLY, S_IRWXU);
+    fd = open("/home/tony/實驗code/論文code/file.txt", O_RDONLY, S_IRWXU);
     // get file info
-    /*if(fstat(fd, &sb) == -1)
+    if(fstat(fd, &sb) == -1)
     {
         printf("fstat error\n");
         exit(1);
@@ -390,37 +385,43 @@ int main(int argc, char* argv[])
         cout << "send:" << UDT::getlasterror().getErrorMessage() << endl;
         exit(1);
     }
-*/
-    char data[10000] = {0};
+
     while(1)
     { 
-        
-        memset(data, '1', sizeof(data));
-        if(UDT::ERROR == (ss = UDT::send(client_data, (char *)data, sizeof(data), 0))) 
+        if(ssize < sb.st_size)
         {
-            cout << "send:" << UDT::getlasterror().getErrorMessage() << endl;
-            exit(1);
-        }
-        else
-        {
-            // record start time when send function first called
-            if(i == 0)
+            if(UDT::ERROR == (ss = UDT::send(client_data, (char *)file_addr + ssize, transmit_size, 0))) 
             {
-                //start time
-                if((old_time = times(&time_start)) == -1)
+                cout << "send:" << UDT::getlasterror().getErrorMessage() << endl;
+                exit(1);
+            }
+            else
+            {
+                // record start time when send function first called
+                if(i == 0)
                 {
-                    printf("time error\n");
-                    exit(1);
+                    //start time
+                    if((old_time = times(&time_start)) == -1)
+                    {
+                        printf("time error\n");
+                        exit(1);
+                    }
+                    pthread_create(&t1, NULL, monitor, &client_data);
                 }
-                pthread_create(&t1, NULL, monitor, &client_data);
+                // record already sent data size
+                ssize += ss;
+                transmit_size -= ss;
             }
         }
-        if(monitor_time >= 600)
+        total_send_size = ssize;
+        if(monitor_time >= 300)
             break;
-       
+        if(ssize == sb.st_size)
+            break;
         
         i++;
     }
+    munmap(file_addr, sb.st_size);
     cout << "end sending" << endl;
     //finish time
     if((new_time = times(&time_end)) == -1)
@@ -429,22 +430,22 @@ int main(int argc, char* argv[])
         exit(1);
     }
     // close file
-    //close(fd);
-    memset(buffer, '\0', sizeof(buffer));
+    close(fd);
+    /*memset(buffer, '\0', sizeof(buffer));
     if(UDT::ERROR == (ss = UDT::recv(client_data, (char *)buffer, sizeof(buffer), 0))) 
     {
         cout << "recv:" << UDT::getlasterror().getErrorMessage() << endl;
         exit(1);
-    }
-    if(strncmp(buffer, "END", ss) == 0)
-    {
-        if(UDT::ERROR == (ss = UDT::send(client_data, (char *)buffer, sizeof(buffer), 0)))
-        {
-            cout << "send:" << UDT::getlasterror().getErrorMessage() << endl;
-            exit(1);
-        }
-        close_connection();     
-    }
+    }*/
+    // if(strncmp(buffer, "END", ss) == 0)
+    // {
+    //     if(UDT::ERROR == (ss = UDT::send(client_data, (char *)buffer, sizeof(buffer), 0)))
+    //     {
+    //         cout << "send:" << UDT::getlasterror().getErrorMessage() << endl;
+    //         exit(1);
+    //     }
+    close_connection();     
+    // }
     return 1;
 }
 void close_connection()
@@ -503,8 +504,8 @@ void close_connection()
     fout.close();
     */
     // close control message exchange
-    throughput_bytes = (double)total_send_size / execute_time;
-    print_throughput(throughput_bytes);  
+    //throughput_bytes = (double)total_send_size / execute_time;
+    //print_throughput(throughput_bytes);  
     /*cout << "send END_TRANS" << endl;
     char control_data3[sizeof(END_TRANS)];
     int ss_control_data3 = 0;
@@ -563,6 +564,7 @@ DWORD WINAPI monitor(LPVOID s)
     UDTSOCKET u = *(UDTSOCKET*)s;
     UDT::TRACEINFO perf;
     fstream fout;
+    int zero_times = 0;
 
     if(mode == 1)
     {
@@ -611,7 +613,7 @@ DWORD WINAPI monitor(LPVOID s)
     //fout << "BK TCP Number," << background_TCP_number << endl;
     //fout << "程式執行時間," << sys_time << endl;
     //fout << "MSS," << mss << endl;
-    fout << "SendPacket," <<"SendRate(Mb/s)," << "FlightSize," << "ReceiveRate(Mb/s)," << "Send Loss," << "Recv Loss," << "RTT(ms)," << "CWnd," << "FlowWindow," << "Retrans," << "PktSndPeriod(us)," << "RecvACK," << "RecvNAK," << "EstimatedBandwidth(Mb/s)," << "Retrans_Total," << "NAK_TotalRecv," << "Total Send Loss," << "Total Recv Loss" << endl;
+    fout << "SendPacket," <<"SendRate(Mb/s)," << "FlightSize," << "ReceiveRate(Mb/s)," << "Send Loss," << "Recv Loss," << "RTT(ms)," << "CWnd," << "FlowWindow," << "Retrans," << "PktSndPeriod(us)," << "RecvACK," << "RecvNAK," << "EstimatedBandwidth(Mb/s)," << "Retrans_Total," << "NAK_TotalRecv," << "Total Send Loss," << "Total Recv Loss," << "Timeout," << "ExpCount," << "usSndDuration"<< endl;
     while (true)
     {
         #ifndef WIN32
@@ -619,16 +621,25 @@ DWORD WINAPI monitor(LPVOID s)
         #else
             Sleep(1000);
         #endif
-            
         if (UDT::ERROR == UDT::perfmon(u, &perf))
         {
             cout << "perfmon: " << UDT::getlasterror().getErrorMessage() << endl;
             break;
         }
         fout << perf.pktSent << "," << perf.mbpsSendRate << "," << perf.pktFlightSize << "," << perf.mbpsRecvRate << "," << perf.pktSndLoss << "," << perf.pktRcvLoss << ","<< perf.msRTT << "," << perf.pktCongestionWindow << ","
-            << perf.pktFlowWindow << "," << perf.pktRetrans << "," << perf.usPktSndPeriod << "," << perf.pktRecvACK << "," << perf.pktRecvNAK << "," << perf.mbpsBandwidth << "," << perf.pktRetransTotal << "," << perf.pktRecvNAKTotal << "," << perf.pktSndLossTotal << "," << perf.pktRcvLossTotal << endl;
+            << perf.pktFlowWindow << "," << perf.pktRetrans << "," << perf.usPktSndPeriod << "," << perf.pktRecvACK << "," << perf.pktRecvNAK << "," << perf.mbpsBandwidth << "," << perf.pktRetransTotal << "," << perf.pktRecvNAKTotal << "," << perf.pktSndLossTotal << "," << perf.pktRcvLossTotal << "," << perf.timeout << "," << perf.exp_count << "," << perf.usSndDuration << endl;
         monitor_time ++;
-        if(monitor_time >= 600)
+        if(monitor_time >= 300)
+            break;
+
+        if(perf.mbpsSendRate == 0 && perf.pktRecvACK == 0 && perf.pktRecvNAK == 0)
+        {
+            zero_times++;
+        }else
+        {
+            zero_times = 0;
+        }
+        if(zero_times >= 5)
             break;
         /*cout << perf.mbpsSendRate << "\t\t" 
             << perf.msRTT << "\t" 

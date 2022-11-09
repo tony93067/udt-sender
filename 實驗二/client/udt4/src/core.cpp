@@ -754,6 +754,7 @@ POST_CONNECT:
    // Re-configure according to the negotiated values.
    m_iMSS = m_ConnRes.m_iMSS;
    m_iFlowWindowSize = m_ConnRes.m_iFlightFlagSize;
+   cout << "m_iFlowWindowSize " << m_iFlowWindowSize << endl;
    m_iPktSize = m_iMSS - 28;
    m_iPayloadSize = m_iPktSize - CPacket::m_iPktHdrSize;
    m_iPeerISN = m_ConnRes.m_iISN;
@@ -2588,7 +2589,9 @@ void CUDT::checkTimers()
          uint64_t exp_int = (timeout_number * (m_iRTT + 4 * m_iRTTVar)) * m_ullCPUFrequency;
 
          if(exp_int < m_ullMinRTOInt * timeout_number)
-            exp_int = m_ullMinRTOInt * timeout_number;
+         {
+           exp_int = m_ullMinRTOInt * timeout_number;
+         }
          next_exp_time = m_ullLastRspTime + exp_int;
       }
       else
@@ -2600,7 +2603,9 @@ void CUDT::checkTimers()
    {
       uint64_t exp_int = (m_iEXPCount * (m_iRTT + 4 * m_iRTTVar) + m_iSYNInterval) * m_ullCPUFrequency;
       if (exp_int < m_iEXPCount * m_ullMinExpInt)
+      {
          exp_int = m_iEXPCount * m_ullMinExpInt;
+      }
       next_exp_time = m_ullLastRspTime + exp_int;
    }
 

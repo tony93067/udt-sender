@@ -317,7 +317,7 @@ int main(int argc, char* argv[])
 
    
     // Getting buffer info
-    /*
+    
     sndbuf = 0;
     if (UDT::ERROR == UDT::getsockopt(client_data, 0, UDT_SNDBUF, (char *)&sndbuf, &oplen))
     {
@@ -334,6 +334,7 @@ int main(int argc, char* argv[])
     {
         cout << "UDT Recv Buffer size : " << sndbuf << endl;
     }
+    /*
     sndbuf = 0;
     if (UDT::ERROR == UDT::getsockopt(client_data, 0, UDP_SNDBUF, (char *)&sndbuf, &oplen))
     {

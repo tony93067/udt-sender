@@ -6,7 +6,7 @@ LB_PATH=/home/tony/實驗code/論文code/實驗二/client/udt4/src
 TCP_PATH=/home/tony/實驗code/論文code/實驗一/TCP/client/memcpy/test_tcp
 UDT_PATH=/home/tony/實驗code/論文code/實驗二/client/udt4/app
 MSS=("1500" "1250" "1000" "750" "500" "250" "100")
-MSS1=("1500" "750" "100")
+MSS1=("100")
 BK=0
 export PATH
 for (( c=1; c<=3; c++ ))
