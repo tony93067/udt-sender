@@ -12,12 +12,18 @@
 #include <sys/times.h>
 #include <string.h>
 #include <arpa/inet.h>
+#include <netinet/tcp.h>
+
 
 #define DIE(x) perror(x),exit(1)
 #define BUFFER_SIZE 10000
 
 int main(int argc, char **argv)
 {
+    // use to get socket info
+    char buf[256];
+    socklen_t len;
+
     struct timeval timeout = {0, 0};
     static struct sockaddr_in server;
     int sd;
@@ -28,9 +34,9 @@ int main(int argc, char **argv)
 
     printf("sizeof(buffer): %ld\n",sizeof(buffer));
 
-    if(argc != 4)
+    if(argc != 5)
     {
-        printf("Usage: %s <server_ip> <client num> <port num>\n",argv[0]);
+        printf("Usage: %s <server_ip> <client num> <port num> <CC Name>\n",argv[0]);
         exit(1);
     }
 
@@ -40,12 +46,31 @@ int main(int argc, char **argv)
     server.sin_port = htons(port);    
     printf("Client Socket Open:\n");
     sd = socket(AF_INET,SOCK_STREAM,IPPROTO_TCP);
-    int ret = setsockopt(sd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+    //int ret = setsockopt(sd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
     if(sd < 0)
     {
         DIE("socket");
     }
 
+    if (getsockopt(sd, IPPROTO_TCP, TCP_CONGESTION, buf, &len) != 0)
+    {
+        perror("getsockopt");
+        return -1;
+    }
+
+    printf("Current: %s\n", buf);
+    if(strcmp(argv[4], "bbr") == 0)
+    {
+        strcpy(buf, "bbr");
+
+        len = strlen(buf);
+
+        if (setsockopt(sd, IPPROTO_TCP, TCP_CONGESTION, buf, len) != 0)
+        {
+            perror("setsockopt");
+            return -1;
+        }
+    }
     /* Connect to the server. */
     if(connect(sd,(struct sockaddr*)&server,sizeof(server)) == -1)
     {
@@ -53,7 +78,6 @@ int main(int argc, char **argv)
     }
 
     printf("Client %s Start Sending!\n", argv[2]);
-    int len;
     // open file 
  
     while(1)
