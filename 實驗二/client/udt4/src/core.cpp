@@ -576,7 +576,6 @@ void CUDT::listen()
 
 void CUDT::connect(const sockaddr* serv_addr)
 {
-   cout << "enter void CUDT::connect(const sockaddr* serv_addr)" << endl;
    CGuard cg(m_ConnectionLock);
 
    if (!m_bOpened)
@@ -703,7 +702,6 @@ int CUDT::connect(const CPacket& response) throw ()
    // this is the 2nd half of a connection request. If the connection is setup successfully this returns 0.
    // returning -1 means there is an error.
    // returning 1 or 2 means the connection is in process and needs more handshake
-   cout << "enter int CUDT::connect(const CPacket& response) throw ()" << endl;
 
    if (!m_bConnecting)
       return -1;
@@ -754,7 +752,6 @@ POST_CONNECT:
    // Re-configure according to the negotiated values.
    m_iMSS = m_ConnRes.m_iMSS;
    m_iFlowWindowSize = m_ConnRes.m_iFlightFlagSize;
-   cout << "m_iFlowWindowSize " << m_iFlowWindowSize << endl;
    m_iPktSize = m_iMSS - 28;
    m_iPayloadSize = m_iPktSize - CPacket::m_iPktHdrSize;
    m_iPeerISN = m_ConnRes.m_iISN;
@@ -824,7 +821,6 @@ POST_CONNECT:
 
 void CUDT::connect(const sockaddr* peer, CHandShake* hs)
 {
-   cout << "enter void CUDT::connect(const sockaddr* peer, CHandShake* hs)" << endl;
    CGuard cg(m_ConnectionLock);
 
    // Uses the smaller MSS between the peers        

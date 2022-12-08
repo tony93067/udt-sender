@@ -6,13 +6,38 @@
 #include <arpa/inet.h>
 #include <string.h>
 #include <sys/times.h>
+#include <pthread.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <sys/mman.h>
+
 
 #define BUFFER_SIZE 10000
 #define SERVER_PORT 8888
 #define SERVER_IP "140.117.171.182"
+
+clock_t old,new;//use for count executing time
+struct tms time_start,time_end;//use for count executing time
+int t = 0;
+
+void* timer(void* arg)
+{
+    while(1)
+    {
+        t++;
+        sleep(1);
+        if(t == 301)
+        {
+            if((new = times(&time_end)) == -1)
+            {
+                printf("time error\n");
+                exit(1);
+            }
+        }
+    }
+    pthread_exit(0);
+}
 
 int main(int argc, char** argv)
 {
@@ -20,17 +45,22 @@ int main(int argc, char** argv)
     struct sockaddr_in server_addr;
     socklen_t server_length = sizeof(server_addr);
 
-    clock_t old,new;//use for count executing time
-    struct tms time_start,time_end;//use for count executing time
-    // UDP recvt timeout
-    struct timeval timeout={10,0};
-
     char buffer[BUFFER_SIZE];
+    struct stat sb;            // get file info
     int recv_size, send_size;
     int start = 0;
-    int total_recv_size = 0;
     double execute_time = 0;
     int result_fd;
+    char* file_addr;
+    pthread_t t1;
+
+    int total_send_size = 0;
+    
+    if(argc != 3)
+    {
+    	printf("usage : ./client <server IP> <BK Number>\n");
+    	exit(1);
+    }
 
     // set socket info
     socket_fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -45,26 +75,54 @@ int main(int argc, char** argv)
 
     
     printf("Socket created successfully\n");
+    
+    // use to get server info
     memset(buffer, '\0', BUFFER_SIZE);
     strcpy(buffer, "Client Data");
-    if(setsockopt(socket_fd, 0, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout)) < 0)
+    /*if(setsockopt(socket_fd, 0, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout)) < 0)
     {
         printf("set socket Error");
         exit(1);
-    }
+    }*/
+
     // Send the message to server:
     if((send_size = sendto(socket_fd, buffer, strlen(buffer), 0, (struct sockaddr*)&server_addr, server_length)) < 0){
         printf("Unable to send message\n");
         return -1;
     }
-    printf("send size %d\n", send_size);
+    printf("send size: %d\n", send_size);
+    printf("send msg: %s\n", buffer);
+
+
+    int fd = open("/home/tony/實驗code/論文code/file.txt", O_RDONLY, S_IRWXU);
+    if (fd == -1) {
+        perror("open\n");
+        exit(EXIT_FAILURE);
+    }
+    // get file info
+    if(fstat(fd, &sb) == -1)
+    {
+        printf("fstat error\n");
+        exit(1);
+    }
+    
+    // map file to memory
+    file_addr = mmap(NULL, sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+    if(file_addr == MAP_FAILED)
+    {
+        printf("mmap error\n");
+        exit(1);
+    }
+
+    // get server info
     memset(buffer, '\0', BUFFER_SIZE);
     recv_size = recvfrom(socket_fd, buffer, sizeof(buffer), 0, (struct sockaddr*)&server_addr, &server_length);
-    printf("Msg from server %s\n", buffer);
+    printf("Msg from server: %s\n", buffer);
     printf("recv size %d\n", recv_size);
     while(1)
     {
         memset(buffer, '\0', BUFFER_SIZE);
+        memcpy(buffer, file_addr + total_send_size, BUFFER_SIZE);
         if(start == 0)
         {
             if((old = times(&time_start)) == -1)
@@ -72,44 +130,57 @@ int main(int argc, char** argv)
                 printf("time error\n");
                 exit(1);
             }
+            if(pthread_create(&t1, NULL, timer, NULL) != 0)
+            {
+                printf("can't create t1 thread\n");
+                exit(1);
+            }
         }
-        // Receive the server's response:
-        printf("hang\n");
-        if((recv_size = recvfrom(socket_fd, buffer, sizeof(buffer), 0, (struct sockaddr*)&server_addr, &server_length)) < 0){
-            printf("Error while receiving server's msg\n");
+        // send packet to server
+        if((send_size = sendto(socket_fd, buffer, sizeof(buffer), 0, (struct sockaddr*)&server_addr, server_length)) < 0){
+            printf("Error while sending msg to server\n");
             return -1;
         }
-        printf("hangend\n");
-        printf("Msg from Server %d\n", recv_size);
-        //printf("strlen %ld \n", strlen(buffer));
-        if(recv_size == 0)
-            break;
-        total_recv_size += recv_size;
         start++;
-        printf("start %d\n", start);
-        printf("-----------------------\n");
-    }
-    if((new = times(&time_end)) == -1)
-    {
-        printf("time error\n");
-        exit(1);
-    }
-    execute_time = (double)(new - old)/sysconf(_SC_CLK_TCK) - 3;
-    char str[100];
-    // record result
-    result_fd = open("result.txt", O_RDWR | O_CREAT | O_APPEND, S_IRWXU);
-    memset(str, '\0', 100);
 
-    printf("Execute Time : %f\n", execute_time);
-    printf("Data Loss : %f\n", total_recv_size/1000000000.);
-    sprintf(str, "Execute Time : %f, Data Loss : %f\n\n", execute_time, total_recv_size/1000000000.);
-    if(write(result_fd, str, strlen(str)) < 0)
+        /*
+
+        bandwidth : 100 Mb/s
+
+        100000000 / 8 = 12500000 bytes
+
+        12500000 / packet size (10000 Bytes) = 1250 Packets
+
+        1000000(us) / 1250 = 800 us
+
+        每 800 us 發送一個 Packet
+
+        */
+        usleep(800);
+        if(t == 301)
+            break;
+        total_send_size += send_size;
+        if(total_send_size == sb.st_size)
+        	break;
+    }
+
+    // 已送出封包數量
+    /*
+    memset(buffer, '\0', BUFFER_SIZE);
+    sprintf(buffer, "%d", start);
+    if((send_size = sendto(socket_fd, buffer, sizeof(buffer), 0, (struct sockaddr*)&server_addr, server_length)) < 0){
+        printf("Error while sending msg to server\n");
+        return -1;
+    }*/
+
+    
+    if(munmap(file_addr, sb.st_size) == -1)
     {
-        printf("write error \n");
+        printf("munmap error\n");
         exit(1);
     }
     // Close the file and socket
-    close(result_fd);
+    close(fd);
     close(socket_fd);
     
     return 0;

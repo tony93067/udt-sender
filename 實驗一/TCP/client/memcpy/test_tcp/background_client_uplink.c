@@ -51,7 +51,7 @@ int main(int argc, char **argv)
     {
         DIE("socket");
     }
-
+    /*
     if (getsockopt(sd, IPPROTO_TCP, TCP_CONGESTION, buf, &len) != 0)
     {
         perror("getsockopt");
@@ -70,7 +70,7 @@ int main(int argc, char **argv)
             perror("setsockopt");
             return -1;
         }
-    }
+    }*/
     /* Connect to the server. */
     if(connect(sd,(struct sockaddr*)&server,sizeof(server)) == -1)
     {

@@ -1,6 +1,8 @@
-all: client background_client background_client_uplink
+all: client background_client_downlink background_client_uplink
 
-% : %.o
-
-%.o: %.c
-	
+% : %.c
+	gcc -o $@ $< -lnsl -lpthread
+clean:
+	rm -f client
+	rm -f background_client_downlink
+	rm -f background_client_uplink
