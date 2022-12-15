@@ -1,0 +1,15 @@
+Method,UDT
+BK TCP Number,3
+Throughput(Mb/s),21.724
+
+
+Method,CTCP
+BK TCP Number,3
+Throughput(Mb/s),0.929783
+
+
+Method,CBiCTCP
+BK TCP Number,3
+Throughput(Mb/s),9.06425
+
+

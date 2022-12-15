@@ -147,8 +147,6 @@ int main(int argc, char **argv)
 
     int fd;
     int j = 0;
-    FILE *ex = NULL;
-    ex = fopen("TCP_receiver.csv", "a");
     // open file 
     fd = open("file.txt", O_CREAT|O_RDWR|O_TRUNC, S_IRWXU);
     if (fd == -1) {

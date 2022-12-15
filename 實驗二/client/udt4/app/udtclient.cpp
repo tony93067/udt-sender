@@ -98,6 +98,7 @@ int current_seq;
 int num_out_of_order = 0;
 
 int monitor_time = 0;
+int total_recv_size = 0; // record receiver data size
 
 //thread variable
 pthread_t t1;
@@ -358,7 +359,7 @@ int main(int argc, char* argv[])
     // Data receiving
     int j = 0; // used to set start time
     int fd; // use to open file
-    int total_recv_size = 0; // record receiver data size
+    
     char buffer[15] = {0};
     int rsize = 0;
     
@@ -366,7 +367,7 @@ int main(int argc, char* argv[])
 	memset(buffer, '\0',sizeof(buffer));
     if(UDT::ERROR == UDT::recv(client_data, (char *)buffer, sizeof(buffer), 0))
     {
-        cout << "recv:" << UDT::getlasterror().getErrorMessage() << endl;
+        cout << "recv file size error" << UDT::getlasterror().getErrorMessage() << endl;
         //cout << rsize << endl;
     }
     int file_size = atoi(buffer);
@@ -379,12 +380,11 @@ int main(int argc, char* argv[])
         // 未收到資料時回傳 -1
         if(UDT::ERROR == (rsize = UDT::recv(client_data, (char *)recv_buf, sizeof(recv_buf), 0))) 
         {
-            cout << "recv:" << UDT::getlasterror().getErrorMessage() << endl;
+            cout << "recv file error" << UDT::getlasterror().getErrorMessage() << endl;
             //cout << rsize << endl;
         }
         else
         {
-            //cout << "rsize : " << rsize << endl;
             // record start time when receive first data packet
             if(j == 0)
             {
@@ -397,7 +397,7 @@ int main(int argc, char* argv[])
                 // create thread to monitor socket(client_data)
                 pthread_create(new pthread_t, NULL, monitor, &client_data);
             }
-            
+            j++;
             if(write(fd, recv_buf, rsize) == -1)
             {
                 cout << "write error" << endl;
@@ -408,13 +408,6 @@ int main(int argc, char* argv[])
         }
         if(monitor_time >= 300)
             break;
-        if(total_recv_size == file_size)
-        {
-            // 接收完成, 關閉檔案
-            cout << "receiving finish & close file" << endl;
-            break;
-        }
-        j++;
     }
      // close file
     close(fd);
@@ -477,25 +470,23 @@ void close_connection()
         strcat(result_addr, ".csv");
         fout.open(result_addr, ios::out|ios::app);
     }
-    
+    */
+    fstream fout;
+    fout.open("Result.csv", ios::out|ios::app);
     ticks = sysconf(_SC_CLK_TCK);
     printf("\n[Close Connection]\n");
 
     execute_time = (double)(new_time - old_time)/ticks; 
-    printf("Total Sending Time (sec): %2.2f\n", execute_time);
     
     //sprintf(str, "UDT\nMss: %d\nTotal Execute Time (sec) : %f\n\n", mss, execute_time);
     
     // write info and close file
-    fout << endl << endl;
     fout << "Method," << method << endl;
     fout << "BK TCP Number," << background_TCP_number << endl;
-    fout << "程式執行時間," << sys_time << endl;
-    fout << "MSS," << mss << endl;
-    fout << "發送時間," << execute_time << endl;
+    fout << "Throughput(Mb/s)," << total_recv_size*8/1000000/execute_time << endl;
     fout << endl << endl;
     fout.close();
-    */
+    
     // close control message exchange
     //throughput_bytes = (double)total_send_size / execute_time;
     //print_throughput(throughput_bytes);  
@@ -630,7 +621,7 @@ DWORD WINAPI monitor(LPVOID s)
         {
             zero_times = 0;
         }
-        if(zero_times >= 5)
+        if(zero_times >= 30)
             break;
     }
     fout << endl << endl;

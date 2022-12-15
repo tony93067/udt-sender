@@ -1,13 +1,15 @@
 #!/bin/bash
 # Program:
-#	execute 50 receivers at the time
-PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:~/bin
-export PATH
-i=1
-while [ "$i" -le "50" ]
+#	0	 BK TCP Server
+
+Method=("cubic" "bbr")
+BK=0
+
+for me in ${Method[@]}
 do
-echo "Client" $i "generate"
-i=$(($i+1))
+	./client 140.117.171.182 $BK $me
+	sleep 50
+	ps
 done
-echo "finish"
+	
 

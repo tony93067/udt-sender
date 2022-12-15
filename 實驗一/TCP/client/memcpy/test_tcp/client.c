@@ -36,7 +36,7 @@ void* timer(void* arg)
     {
         t++;
 		sleep(1);
-        if(t == 301)
+        if(t == 300)
         {
             if((new_time = times(&time_end)) == -1)
             {
@@ -147,8 +147,6 @@ int main(int argc, char **argv)
 
     int fd;
     int j = 0;
-    FILE *ex = NULL;
-    ex = fopen("TCP_receiver.csv", "a");
     // open file 
     fd = open("file.txt", O_CREAT|O_RDWR|O_TRUNC, S_IRWXU);
     if (fd == -1) {
@@ -181,7 +179,7 @@ int main(int argc, char **argv)
             DIE("write");
         }
         total_recv_size += recv_size;
-        if(t == 301)
+        if(t == 300)
             break;
     }
     if(pthread_join(t1, NULL) != 0)

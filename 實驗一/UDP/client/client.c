@@ -19,21 +19,49 @@
 
 clock_t old,new;//use for count executing time
 struct tms time_start,time_end;//use for count executing time
+double total_recv_packets = 0;
+int Background_TCP_Number = 0;
 int t = 0;
+double ticks = 0;
 
 void* timer(void* arg)
 {
+	int ex = open("UDP_Receiver.csv", O_CREAT|O_RDWR|O_APPEND, S_IRWXU);
     while(1)
     {
         t++;
         sleep(1);
-        if(t == 301)
+        if(t == 300)
         {
             if((new = times(&time_end)) == -1)
             {
                 printf("time error\n");
                 exit(1);
             }
+            ticks = sysconf(_SC_CLK_TCK);
+            double execute_time = (new - old)/ticks;
+            printf("Execute Time: %2.2f\n", execute_time);
+            printf("total recv size %f Bytes\n", total_recv_packets*BUFFER_SIZE);
+            
+            char str[100] = {0};
+            sprintf(str, "%s\n", "UDP");
+            write(ex, str, sizeof(str));
+            
+            memset(str, '\0', sizeof(str));
+            sprintf(str, "%s\t%d\n", "Background_TCP_Number", Background_TCP_Number);
+            write(ex, str, sizeof(str));
+            
+            double throughput = (total_recv_packets*BUFFER_SIZE*8/1000000);
+            memset(str, '\0', sizeof(str));
+            sprintf(str, "%s\t%lf\n", "Throughput(Mb/s)", throughput/execute_time);
+            write(ex, str, sizeof(str));
+            
+            memset(str, '\0', sizeof(str));
+            sprintf(str, "%s\t%lf\n\n", "Loss Rate: ", total_recv_packets/2500000);
+            write(ex, str, sizeof(str));
+            close(ex);
+            break;
+            
         }
     }
     pthread_exit(0);
@@ -46,12 +74,10 @@ int main(int argc, char** argv)
     socklen_t server_length = sizeof(server_addr);
 
     char buffer[BUFFER_SIZE];
-    struct stat sb;            // get file info
     int recv_size, send_size;
     int start = 0;
     double execute_time = 0;
     int result_fd;
-    char* file_addr;
     pthread_t t1;
 
     int total_send_size = 0;
@@ -61,7 +87,7 @@ int main(int argc, char** argv)
     	printf("usage : ./client <server IP> <BK Number>\n");
     	exit(1);
     }
-
+	Background_TCP_Number = atoi(argv[2]);
     // set socket info
     socket_fd = socket(AF_INET, SOCK_DGRAM, 0);
     if(socket_fd < 0){
@@ -93,27 +119,6 @@ int main(int argc, char** argv)
     printf("send size: %d\n", send_size);
     printf("send msg: %s\n", buffer);
 
-
-    int fd = open("/home/tony/實驗code/論文code/file.txt", O_RDONLY, S_IRWXU);
-    if (fd == -1) {
-        perror("open\n");
-        exit(EXIT_FAILURE);
-    }
-    // get file info
-    if(fstat(fd, &sb) == -1)
-    {
-        printf("fstat error\n");
-        exit(1);
-    }
-    
-    // map file to memory
-    file_addr = mmap(NULL, sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-    if(file_addr == MAP_FAILED)
-    {
-        printf("mmap error\n");
-        exit(1);
-    }
-
     // get server info
     memset(buffer, '\0', BUFFER_SIZE);
     recv_size = recvfrom(socket_fd, buffer, sizeof(buffer), 0, (struct sockaddr*)&server_addr, &server_length);
@@ -122,46 +127,34 @@ int main(int argc, char** argv)
     while(1)
     {
         memset(buffer, '\0', BUFFER_SIZE);
-        memcpy(buffer, file_addr + total_send_size, BUFFER_SIZE);
-        if(start == 0)
-        {
-            if((old = times(&time_start)) == -1)
-            {
-                printf("time error\n");
-                exit(1);
-            }
-            if(pthread_create(&t1, NULL, timer, NULL) != 0)
-            {
-                printf("can't create t1 thread\n");
-                exit(1);
-            }
-        }
-        // send packet to server
-        if((send_size = sendto(socket_fd, buffer, sizeof(buffer), 0, (struct sockaddr*)&server_addr, server_length)) < 0){
+        if((recv_size = recvfrom(socket_fd, buffer, sizeof(buffer), 0, (struct sockaddr*)&server_addr, &server_length)) < 0){
             printf("Error while sending msg to server\n");
             return -1;
+        }else
+        {
+        	if(start == 0)
+		    {
+		        if((old = times(&time_start)) == -1)
+		        {
+		            printf("time error\n");
+		            exit(1);
+		        }
+		        if(pthread_create(&t1, NULL, timer, NULL) != 0)
+		        {
+		            printf("can't create t1 thread\n");
+		            exit(1);
+		        }
+		    }
         }
         start++;
+        total_recv_packets++;
+        // send packet to server
+        
 
-        /*
-
-        bandwidth : 100 Mb/s
-
-        100000000 / 8 = 12500000 bytes
-
-        12500000 / packet size (10000 Bytes) = 1250 Packets
-
-        1000000(us) / 1250 = 800 us
-
-        每 800 us 發送一個 Packet
-
-        */
-        usleep(800);
-        if(t == 301)
+       
+        if(t == 300)
             break;
-        total_send_size += send_size;
-        if(total_send_size == sb.st_size)
-        	break;
+        
     }
 
     // 已送出封包數量
@@ -173,14 +166,7 @@ int main(int argc, char** argv)
         return -1;
     }*/
 
-    
-    if(munmap(file_addr, sb.st_size) == -1)
-    {
-        printf("munmap error\n");
-        exit(1);
-    }
     // Close the file and socket
-    close(fd);
     close(socket_fd);
     
     return 0;
